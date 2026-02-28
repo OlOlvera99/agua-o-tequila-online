@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>🥃 Agua o Tequila</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥃</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --gold: #f5be14;
+      --gold-dim: #c49a10;
+      --gold-glow: rgba(245, 190, 20, 0.3);
+      --bg: #0a0a0f;
+      --bg2: #12121a;
+      --bg3: #1a1a25;
+      --bg4: #22222f;
+      --text: #e8e8f0;
+      --text-dim: #8888a0;
+      --green: #22c55e;
+      --green-bg: rgba(34, 197, 94, 0.15);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.15);
+      --blue: #3b82f6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body { background: linear-gradient(180deg, #0a0a0f 0%, #0d0d18 50%, #0a0a0f 100%); }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    #root { position: relative; z-index: 1; }
+
+    .app-container {
+      max-width: 480px; margin: 0 auto; min-height: 100vh;
+      padding: 20px; display: flex; flex-direction: column;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 14px 28px; border-radius: 14px; border: none;
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 16px;
+      cursor: pointer; transition: all 0.2s; position: relative;
+      overflow: hidden; letter-spacing: 0.02em;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold), #daa520);
+      color: #0a0a0f; box-shadow: 0 4px 20px var(--gold-glow);
+    }
+    .btn-gold:hover { box-shadow: 0 6px 30px var(--gold-glow); }
+    .btn-ghost {
+      background: var(--bg3); color: var(--text); border: 1px solid var(--bg4);
+    }
+    .btn-green {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+    }
+    .btn-red {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25);
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-full { width: 100%; }
+
+    /* Inputs */
+    .input {
+      width: 100%; padding: 14px 18px; border-radius: 12px;
+      border: 1.5px solid var(--bg4); background: var(--bg2);
+      color: var(--text); font-family: 'Outfit', sans-serif; font-size: 16px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .input:focus { border-color: var(--gold); }
+    .input::placeholder { color: var(--text-dim); }
+
+    /* Cards */
+    .card {
+      background: var(--bg2); border: 1px solid var(--bg4);
+      border-radius: 16px; padding: 20px;
+    }
+    .card-glow {
+      border-color: var(--gold-dim);
+      box-shadow: 0 0 30px var(--gold-glow), inset 0 0 30px rgba(245, 190, 20, 0.05);
+    }
+
+    /* Logo animation */
+    .logo-emoji { font-size: 60px; display: inline-block; }
+    .logo-title {
+      font-size: 32px; font-weight: 800; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--gold), #fff, var(--gold));
+      background-size: 200% 200%;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 3s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    /* Phase badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 20px; font-size: 13px;
+      font-weight: 600; letter-spacing: 0.02em;
+    }
+    .badge-gold { background: rgba(245, 190, 20, 0.15); color: var(--gold); }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-red { background: var(--red-bg); color: var(--red); }
+
+    /* Player chips */
+    .player-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 12px;
+      background: var(--bg3); border: 1px solid var(--bg4);
+      font-weight: 500; transition: all 0.2s;
+    }
+    .player-chip-host { border-color: var(--gold-dim); }
+    .player-avatar {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700;
+      background: linear-gradient(135deg, var(--bg4), var(--bg3));
+    }
+
+    /* Affirmation quote */
+    .affirmation-box {
+      position: relative; padding: 24px;
+      background: linear-gradient(135deg, var(--bg3), var(--bg2));
+      border-radius: 16px; border-left: 4px solid var(--gold);
+      font-size: 20px; font-weight: 500; line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+    .affirmation-box::before {
+      content: '"'; position: absolute; top: 8px; left: 14px;
+      font-size: 48px; color: var(--gold); opacity: 0.3;
+      font-family: Georgia, serif;
+    }
+
+    /* Countdown */
+    .countdown {
+      font-family: 'Space Mono', monospace;
+      font-size: 48px; font-weight: 700;
+      color: var(--gold); text-align: center;
+    }
+
+    /* Timer bar */
+    .timer-bar {
+      height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden;
+    }
+    .timer-fill {
+      height: 100%; background: var(--gold); border-radius: 2px;
+      transition: width 1s linear;
+    }
+
+    /* Result list */
+    .result-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 10px; margin-bottom: 6px;
+    }
+    .result-correct { background: var(--green-bg); }
+    .result-wrong { background: var(--red-bg); }
+
+    /* Shot box */
+    .shot-box {
+      background: linear-gradient(135deg, rgba(245, 190, 20, 0.12), rgba(245, 190, 20, 0.05));
+      border: 2px solid var(--gold-dim); border-radius: 16px;
+      padding: 20px; text-align: center;
+    }
+    .shot-names {
+      font-size: 22px; font-weight: 700; color: var(--gold);
+      margin-top: 8px;
+    }
+
+    /* Score table */
+    .score-row {
+      display: flex; align-items: center; padding: 10px 0;
+      border-bottom: 1px solid var(--bg4);
+    }
+    .score-row:last-child { border: none; }
+    .score-rank {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px; margin-right: 12px;
+      background: var(--bg4); color: var(--text-dim);
+    }
+    .score-rank-1 { background: var(--gold); color: #0a0a0f; }
+
+    /* Level selector */
+    .level-option {
+      flex: 1; padding: 12px 8px; border-radius: 12px;
+      border: 2px solid var(--bg4); background: var(--bg3);
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      font-weight: 600; font-size: 14px;
+    }
+    .level-option.active { border-color: var(--gold); background: rgba(245, 190, 20, 0.1); }
+
+    /* Animations */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    .pop-in { animation: popIn 0.3s ease-out; }
+    .slide-up { animation: slideUp 0.5s ease-out; }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+    /* Utility */
+    .gap-8 { gap: 8px; } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; } .gap-20 { gap: 20px; }
+    .flex { display: flex; } .flex-col { flex-direction: column; }
+    .items-center { align-items: center; } .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .text-center { text-align: center; }
+    .text-dim { color: var(--text-dim); }
+    .text-gold { color: var(--gold); }
+    .text-sm { font-size: 14px; }
+    .text-xs { font-size: 12px; }
+    .w-full { width: 100%; }
+    .mt-auto { margin-top: auto; }
+    .grow { flex-grow: 1; }
+    .font-mono { font-family: 'Space Mono', monospace; }
+
+    /* Connection indicator */
+    .connection-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    .connected { background: var(--green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
+    .disconnected { background: var(--red); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    // ═══════════ SOCKET HOOK ═══════════
+    function useGameSocket() {
+      const socketRef = useRef(null);
+      const [connected, setConnected] = useState(false);
+      const [mySocketId, setMySocketId] = useState(null);
+      const [roomState, setRoomState] = useState(null);
+      const [turnData, setTurnData] = useState(null);
+      const [guessCount, setGuessCount] = useState({ voted: 0, total: 0 });
+      const [confirmed, setConfirmed] = useState(false);
+      const [revealData, setRevealData] = useState(null);
+      const [scoreboard, setScoreboard] = useState([]);
+      const [gameEnded, setGameEnded] = useState(false);
+      const [error, setError] = useState(null);
+
+      useEffect(() => {
+        const url = window.location.origin;
+        const socket = io(url, { transports: ['websocket', 'polling'] });
+
+        socket.on('connect', () => { setConnected(true); setMySocketId(socket.id); });
+        socket.on('disconnect', () => setConnected(false));
+        socket.on('ROOM_UPDATE', (s) => { setRoomState(s); setGameEnded(false); });
+        socket.on('NEW_TURN', (d) => {
+          setTurnData(d); setRevealData(null); setConfirmed(false);
+          setGuessCount({ voted: 0, total: 0 });
+        });
+        socket.on('PLAYER_CONFIRMED', () => setConfirmed(true));
+        socket.on('GUESS_COUNT', (d) => setGuessCount(d));
+        socket.on('REVEAL', (d) => setRevealData(d));
+        socket.on('SCOREBOARD', (d) => setScoreboard(d.scores));
+        socket.on('GAME_ENDED', (d) => { setGameEnded(true); setScoreboard(d.scores); });
+        socket.on('ERROR', (d) => setError(d.message));
+
+        socketRef.current = socket;
+        return () => socket.disconnect();
+      }, []);
+
+      const emit = useCallback((event, data, cb) => {
+        socketRef.current?.emit(event, data, cb);
+      }, []);
+
+      return {
+        connected, mySocketId, roomState, turnData, guessCount,
+        confirmed, revealData, scoreboard, gameEnded, error,
+        setError, emit
+      };
+    }
+
+    // ═══════════ MAIN APP ═══════════
+    function App() {
+      const {
+        connected, mySocketId, roomState, turnData, guessCount,
+        confirmed, revealData, scoreboard, gameEnded, error,
+        setError, emit
+      } = useGameSocket();
+
+      const [screen, setScreen] = useState('home'); // home | lobby | game
+      const [playerName, setPlayerName] = useState('');
+      const [joinCode, setJoinCode] = useState('');
+      const [myGuess, setMyGuess] = useState(null);
+      const [timerLeft, setTimerLeft] = useState(0);
+
+      // Leer roomId de URL
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('sala') || params.get('room');
+        if (code) setJoinCode(code.toUpperCase());
+      }, []);
+
+      // Timer countdown
+      useEffect(() => {
+        if (confirmed && !revealData && roomState?.settings?.timerSeconds > 0) {
+          setTimerLeft(roomState.settings.timerSeconds);
+          const interval = setInterval(() => {
+            setTimerLeft(prev => {
+              if (prev <= 1) { clearInterval(interval); return 0; }
+              return prev - 1;
+            });
+          }, 1000);
+          return () => clearInterval(interval);
+        }
+      }, [confirmed, revealData]);
+
+      // Reset guess on new turn
+      useEffect(() => { setMyGuess(null); }, [turnData?.round]);
+
+      const isHost = roomState?.hostId === mySocketId;
+      const isMyTurn = turnData?.currentPlayerId === mySocketId;
+      const roomId = roomState?.id;
+
+      // Determine current game phase
+      let phase = 'lobby';
+      if (turnData && !revealData && !gameEnded) {
+        phase = confirmed ? 'guessing' : 'confirming';
+      } else if (revealData) {
+        phase = 'reveal';
+      } else if (gameEnded) {
+        phase = 'ended';
+      }
+
+      // ─── Actions ───
+      function createRoom() {
+        if (!playerName.trim()) return;
+        emit('CREATE_ROOM', {
+          playerName: playerName.trim(),
+          settings: { level: 'picante', timerSeconds: 30 }
+        }, (res) => {
+          if (res.roomId) {
+            setScreen('lobby');
+            window.history.replaceState({}, '', `?sala=${res.roomId}`);
+          }
+        });
+      }
+
+      function joinRoom() {
+        if (!playerName.trim() || !joinCode.trim()) return;
+        emit('JOIN_ROOM', {
+          roomId: joinCode.trim().toUpperCase(),
+          playerName: playerName.trim()
+        }, (res) => {
+          if (res.error) { setError(res.error); return; }
+          if (res.success) setScreen('lobby');
+        });
+      }
+
+      function startGame() {
+        emit('START_GAME', { roomId });
+        setScreen('game');
+      }
+
+      function confirmTruth(isTrue) {
+        emit('CONFIRM_TRUTH', { roomId, isTrue });
+      }
+
+      function submitGuess(guess) {
+        if (myGuess) return;
+        setMyGuess(guess);
+        emit('SUBMIT_GUESS', { roomId, guess });
+      }
+
+      function nextTurn() {
+        emit('NEXT_TURN', { roomId });
+      }
+
+      function regenerate() {
+        emit('REGENERATE', { roomId });
+      }
+
+      function endGame() {
+        emit('END_GAME', { roomId });
+        setScreen('lobby');
+      }
+
+      function updateLevel(level) {
+        emit('UPDATE_SETTINGS', { roomId, settings: { level } });
+      }
+
+      function copyLink() {
+        const url = `${window.location.origin}?sala=${roomId}`;
+        navigator.clipboard?.writeText(url);
+      }
+
+      // ═══════════ RENDER ═══════════
+
+      // ─── HOME SCREEN ───
+      if (screen === 'home') {
+        return (
+          <div className="app-container justify-center">
+            <div className="flex flex-col gap-20 items-center fade-in">
+              <div className="text-center flex flex-col gap-12 items-center">
+                <div className="logo-emoji">🥃</div>
+                <h1 className="logo-title">Agua o Tequila</h1>
+                <p className="text-dim" style={{maxWidth: 280, lineHeight: 1.5}}>
+                  El juego de fiesta donde la verdad duele... y la mentira también 🔥
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-12 w-full" style={{maxWidth: 360}}>
+                <input
+                  className="input"
+                  placeholder="Tu nombre"
+                  value={playerName}
+                  onChange={e => setPlayerName(e.target.value)}
+                  maxLength={20}
+                  onKeyDown={e => e.key === 'Enter' && (joinCode ? joinRoom() : createRoom())}
+                />
+
+                <button
+                  className="btn btn-gold btn-full"
+                  onClick={createRoom}
+                  disabled={!playerName.trim() || !connected}
+                  style={{fontSize: 18, padding: '16px 28px'}}
+                >
+                  Crear Sala
+                </button>
+
+                <div className="flex items-center gap-12">
+                  <div style={{height: 1, flex: 1, background: 'var(--bg4)'}} />
+                  <span className="text-dim text-sm">o únete</span>
+                  <div style={{height: 1, flex: 1, background: 'var(--bg4)'}} />
+                </div>
+
+                <div className="flex gap-8">
+                  <input
+                    className="input"
+                    placeholder="Código de sala"
+                    value={joinCode}
+                    onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                    maxLength={10}
+                    style={{fontFamily: 'Space Mono, monospace', letterSpacing: '0.1em', flex: 1}}
+                    onKeyDown={e => e.key === 'Enter' && joinRoom()}
+                  />
+                  <button
+                    className="btn btn-ghost"
+                    onClick={joinRoom}
+                    disabled={!playerName.trim() || !joinCode.trim() || !connected}
+                  >
+                    Entrar
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-8 text-xs text-dim">
+                <span className={`connection-dot ${connected ? 'connected' : 'disconnected'}`} />
+                {connected ? 'Conectado' : 'Conectando...'}
+              </div>
+
+              {error && (
+                <div className="card pop-in" style={{
+                  borderColor: 'var(--red)', background: 'var(--red-bg)',
+                  textAlign: 'center', color: 'var(--red)', width: '100%', maxWidth: 360
+                }} onClick={() => setError(null)}>
+                  {error}
+                </div>
+              )}
+
+              <p className="text-dim text-xs">by Mati Media</p>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── LOBBY SCREEN ───
+      if (screen === 'lobby' && roomState && (!turnData || gameEnded)) {
+        const level = roomState.settings?.level || 'picante';
+        return (
+          <div className="app-container fade-in">
+            <div className="flex flex-col gap-20">
+              {/* Header */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-dim text-xs" style={{marginBottom: 4}}>SALA</div>
+                  <div className="font-mono text-gold" style={{fontSize: 24, fontWeight: 700, letterSpacing: '0.08em'}}>
+                    {roomState.id}
+                  </div>
+                </div>
+                <button className="btn btn-ghost text-sm" onClick={copyLink}>
+                  📋 Copiar link
+                </button>
+              </div>
+
+              {/* Level selector (host only) */}
+              {isHost && (
+                <div className="flex flex-col gap-8">
+                  <div className="text-dim text-sm" style={{fontWeight: 600}}>NIVEL</div>
+                  <div className="flex gap-8">
+                    {[
+                      { id: 'suave', emoji: '🟢', label: 'Suave' },
+                      { id: 'picante', emoji: '🟡', label: 'Picante' },
+                      { id: 'extrema', emoji: '🔴', label: 'Extrema' },
+                    ].map(opt => (
+                      <div
+                        key={opt.id}
+                        className={`level-option ${level === opt.id ? 'active' : ''}`}
+                        onClick={() => updateLevel(opt.id)}
+                      >
+                        <div style={{fontSize: 20, marginBottom: 4}}>{opt.emoji}</div>
+                        {opt.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isHost && (
+                <div className="badge badge-gold" style={{alignSelf: 'flex-start'}}>
+                  {level === 'suave' ? '🟢' : level === 'extrema' ? '🔴' : '🟡'}
+                  Nivel: {level.charAt(0).toUpperCase() + level.slice(1)}
+                </div>
+              )}
+
+              {/* Players */}
+              <div className="flex flex-col gap-8">
+                <div className="flex justify-between items-center">
+                  <div className="text-dim text-sm" style={{fontWeight: 600}}>
+                    JUGADORES ({roomState.playerCount}/8)
+                  </div>
+                </div>
+                <div className="flex flex-col gap-8">
+                  {roomState.players.map((p, i) => (
+                    <div key={p.socketId} className={`player-chip ${p.isHost ? 'player-chip-host' : ''}`}>
+                      <div className="player-avatar" style={p.isHost ? {background: 'linear-gradient(135deg, var(--gold), var(--gold-dim))', color: '#0a0a0f'} : {}}>
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{fontWeight: 500}}>{p.name}</span>
+                      {p.isHost && <span className="badge badge-gold text-xs" style={{marginLeft: 'auto'}}>HOST</span>}
+                      {p.socketId === mySocketId && !p.isHost && <span className="text-dim text-xs" style={{marginLeft: 'auto'}}>Tú</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Game ended scoreboard */}
+              {gameEnded && scoreboard.length > 0 && (
+                <div className="card card-glow slide-up">
+                  <div className="text-center" style={{marginBottom: 16}}>
+                    <div style={{fontSize: 36, marginBottom: 8}}>🏆</div>
+                    <div style={{fontWeight: 700, fontSize: 18}}>¡Juego terminado!</div>
+                  </div>
+                  {scoreboard.map((s, i) => (
+                    <div key={s.playerName} className="score-row">
+                      <div className={`score-rank ${i === 0 ? 'score-rank-1' : ''}`}>{i + 1}</div>
+                      <span style={{flex: 1, fontWeight: 500}}>{s.playerName}</span>
+                      <span className="text-gold font-mono" style={{fontWeight: 700}}>
+                        🥃 {s.shotsTaken}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Start button (host) / Waiting (non-host) */}
+              <div className="mt-auto" style={{paddingBottom: 20}}>
+                {isHost ? (
+                  <button
+                    className="btn btn-gold btn-full"
+                    onClick={startGame}
+                    disabled={roomState.playerCount < 2}
+                    style={{fontSize: 18, padding: '18px'}}
+                  >
+                    {roomState.playerCount < 2 ? 'Esperando jugadores...' : '🥃 ¡A JUGAR!'}
+                  </button>
+                ) : (
+                  <div className="text-center text-dim pulse">
+                    Esperando a que el host inicie el juego...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── GAME SCREEN ───
+      if (turnData) {
+        // When we get turnData, switch to game screen
+        if (screen !== 'game') setScreen('game');
+
+        return (
+          <div className="app-container">
+            {/* Game header */}
+            <div className="flex justify-between items-center" style={{marginBottom: 20}}>
+              <div className="badge badge-gold">Ronda {turnData.round}</div>
+              <div className="flex items-center gap-8">
+                <span className={`connection-dot ${connected ? 'connected' : 'disconnected'}`} />
+                <span className="font-mono text-dim text-xs">{roomState?.id}</span>
+              </div>
+            </div>
+
+            {/* ═══ PHASE: CONFIRMING ═══ */}
+            {phase === 'confirming' && (
+              <div className="flex flex-col gap-20 grow fade-in">
+                {/* Player in turn */}
+                <div className="text-center flex flex-col gap-8">
+                  <div className="text-dim text-sm">ES EL TURNO DE</div>
+                  <div style={{fontSize: 28, fontWeight: 800}} className="text-gold">
+                    {turnData.currentPlayer}
+                  </div>
+                </div>
+
+                {/* Affirmation */}
+                <div className="affirmation-box slide-up">
+                  {turnData.affirmation}
+                </div>
+
+                {isMyTurn ? (
+                  /* I'm the current player — confirm truth privately */
+                  <div className="card card-glow pop-in flex flex-col gap-16">
+                    <div className="text-center">
+                      <div style={{fontSize: 24, marginBottom: 8}}>🤫</div>
+                      <div style={{fontWeight: 700, fontSize: 16, marginBottom: 4}}>
+                        ¡No dejes que nadie vea tu pantalla!
+                      </div>
+                      <div className="text-dim text-sm">
+                        ¿Esta afirmación es verdad o mentira sobre ti?
+                      </div>
+                    </div>
+                    <div className="flex gap-12">
+                      <button
+                        className="btn btn-green grow"
+                        onClick={() => confirmTruth(true)}
+                        style={{padding: '18px', fontSize: 17}}
+                      >
+                        ✅ Sí, es verdad
+                      </button>
+                      <button
+                        className="btn btn-red grow"
+                        onClick={() => confirmTruth(false)}
+                        style={{padding: '18px', fontSize: 17}}
+                      >
+                        ❌ Es mentira
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Waiting for current player to confirm */
+                  <div className="text-center text-dim pulse" style={{marginTop: 20}}>
+                    <div style={{fontSize: 32, marginBottom: 12}}>🤔</div>
+                    Esperando a que {turnData.currentPlayer} responda...
+                  </div>
+                )}
+
+                {/* Host controls */}
+                {isHost && (
+                  <div className="flex gap-8 mt-auto" style={{paddingBottom: 20}}>
+                    <button className="btn btn-ghost grow text-sm" onClick={regenerate}>
+                      🔄 Cambiar afirmación
+                    </button>
+                    <button className="btn btn-ghost text-sm" onClick={endGame} style={{color: 'var(--red)'}}>
+                      ✕ Terminar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ PHASE: GUESSING ═══ */}
+            {phase === 'guessing' && !revealData && (
+              <div className="flex flex-col gap-20 grow fade-in">
+                {/* Affirmation reminder */}
+                <div className="text-center flex flex-col gap-4">
+                  <div className="text-dim text-sm">{turnData.currentPlayer} dice:</div>
+                </div>
+                <div className="affirmation-box">
+                  {turnData.affirmation}
+                </div>
+
+                {/* Timer */}
+                {timerLeft > 0 && (
+                  <div className="flex flex-col gap-8">
+                    <div className="timer-bar">
+                      <div className="timer-fill" style={{
+                        width: `${(timerLeft / (roomState?.settings?.timerSeconds || 30)) * 100}%`
+                      }} />
+                    </div>
+                    <div className="font-mono text-dim text-center text-sm">{timerLeft}s</div>
+                  </div>
+                )}
+
+                {!isMyTurn ? (
+                  /* I need to vote */
+                  <div className="flex flex-col gap-12">
+                    <div className="text-center" style={{fontWeight: 600}}>
+                      ¿Crees que {turnData.currentPlayer} dice la verdad?
+                    </div>
+                    {!myGuess ? (
+                      <div className="flex gap-12">
+                        <button
+                          className="btn btn-green grow"
+                          onClick={() => submitGuess('verdad')}
+                          style={{padding: '20px', fontSize: 18}}
+                        >
+                          ✅ Verdad
+                        </button>
+                        <button
+                          className="btn btn-red grow"
+                          onClick={() => submitGuess('mentira')}
+                          style={{padding: '20px', fontSize: 18}}
+                        >
+                          ❌ Mentira
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="card text-center pop-in">
+                        <div style={{fontSize: 24, marginBottom: 8}}>
+                          {myGuess === 'verdad' ? '✅' : '❌'}
+                        </div>
+                        <div style={{fontWeight: 600}}>
+                          Votaste: {myGuess === 'verdad' ? 'VERDAD' : 'MENTIRA'}
+                        </div>
+                        <div className="text-dim text-sm" style={{marginTop: 8}}>
+                          {guessCount.voted}/{guessCount.total} han votado
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* I'm the player in turn — waiting for votes */
+                  <div className="card card-glow text-center pop-in">
+                    <div style={{fontSize: 32, marginBottom: 12}}>🗳️</div>
+                    <div style={{fontWeight: 700, fontSize: 18, marginBottom: 8}}>
+                      ¡Están votando!
+                    </div>
+                    <div className="text-dim">
+                      Mantén tu mejor cara de póker... 😏
+                    </div>
+                    <div className="font-mono text-gold" style={{fontSize: 32, marginTop: 16, fontWeight: 700}}>
+                      {guessCount.voted} / {guessCount.total}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vote count (for non-turn players who already voted) */}
+                {!isMyTurn && myGuess && (
+                  <div className="text-center text-dim text-sm">
+                    Esperando a los demás... ({guessCount.voted}/{guessCount.total})
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ PHASE: REVEAL ═══ */}
+            {phase === 'reveal' && revealData && (
+              <div className="flex flex-col gap-16 grow slide-up">
+                {/* Truth reveal */}
+                <div className="card text-center" style={{
+                  borderColor: revealData.truth ? 'var(--green)' : 'var(--red)',
+                  background: revealData.truth ? 'var(--green-bg)' : 'var(--red-bg)',
+                }}>
+                  <div style={{fontSize: 40, marginBottom: 8}}>
+                    {revealData.truth ? '✅' : '❌'}
+                  </div>
+                  <div style={{fontWeight: 800, fontSize: 22, marginBottom: 8}}>
+                    {revealData.truth ? '¡ERA VERDAD!' : '¡ERA MENTIRA!'}
+                  </div>
+                  <div className="text-dim text-sm" style={{lineHeight: 1.4}}>
+                    "{revealData.affirmation}"
+                  </div>
+                </div>
+
+                {/* Guess results */}
+                <div className="flex flex-col gap-8">
+                  <div className="text-dim text-sm" style={{fontWeight: 600}}>RESULTADOS</div>
+                  {revealData.guesses.map((g, i) => (
+                    <div key={i} className={`result-row ${g.correct ? 'result-correct' : 'result-wrong'}`}>
+                      <span style={{fontWeight: 500}}>{g.playerName}</span>
+                      <span style={{fontWeight: 600}}>
+                        {g.guess === 'verdad' ? 'Verdad' : 'Mentira'}
+                        {' '}
+                        {g.correct ? '✓' : '✗'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Who drinks */}
+                <div className="shot-box pop-in">
+                  <div style={{fontSize: 28}}>🥃</div>
+                  <div className="text-dim text-sm" style={{marginTop: 4}}>
+                    {revealData.reason === 'all_correct' && '¡Todos acertaron! El del turno toma'}
+                    {revealData.reason === 'all_wrong' && '¡Todos fallaron! El del turno toma'}
+                    {revealData.reason === 'mixed' && 'Los que fallaron toman'}
+                  </div>
+                  <div className="shot-names">
+                    {revealData.drinkers.join(', ')}
+                  </div>
+                </div>
+
+                {/* Scoreboard */}
+                {scoreboard.length > 0 && (
+                  <div className="card">
+                    <div className="text-dim text-sm" style={{fontWeight: 600, marginBottom: 12}}>
+                      TABLA DE SHOTS 🏆
+                    </div>
+                    {scoreboard.map((s, i) => (
+                      <div key={s.playerName} className="score-row">
+                        <div className={`score-rank ${i === 0 ? 'score-rank-1' : ''}`}>{i + 1}</div>
+                        <span style={{flex: 1, fontWeight: 500}}>{s.playerName}</span>
+                        <span className="text-dim text-sm" style={{marginRight: 12}}>
+                          {s.correctGuesses} ✓
+                        </span>
+                        <span className="text-gold font-mono" style={{fontWeight: 700}}>
+                          🥃 {s.shotsTaken}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Controls */}
+                {isHost && (
+                  <div className="flex gap-8" style={{paddingBottom: 20}}>
+                    <button className="btn btn-gold grow" onClick={nextTurn} style={{fontSize: 16, padding: '16px'}}>
+                      ▶ Siguiente Turno
+                    </button>
+                    <button className="btn btn-ghost" onClick={endGame} style={{color: 'var(--red)'}}>
+                      ✕ Fin
+                    </button>
+                  </div>
+                )}
+
+                {!isHost && (
+                  <div className="text-center text-dim text-sm pulse" style={{paddingBottom: 20}}>
+                    Esperando al host para continuar...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Fallback
+      return (
+        <div className="app-container justify-center items-center">
+          <div className="logo-emoji">🥃</div>
+          <div className="text-dim pulse" style={{marginTop: 20}}>Cargando...</div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

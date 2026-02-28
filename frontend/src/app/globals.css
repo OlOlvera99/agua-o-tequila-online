@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold: #f5be14;
+  --gold-dark: #d4a512;
+}
+
+body {
+  background-color: #111827;
+  color: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Prevent pull to refresh on mobile */
+html, body {
+  overflow: hidden;
+  height: 100dvh;
+}
+
+#__next {
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+/* Gold gradient button */
+.btn-gold {
+  @apply font-bold py-3 px-6 rounded-xl transition-all duration-200 active:scale-95;
+  background: linear-gradient(135deg, #f5be14 0%, #d4a512 100%);
+  color: #111827;
+  box-shadow: 0 4px 14px rgba(245, 190, 20, 0.3);
+}
+
+.btn-gold:hover {
+  box-shadow: 0 6px 20px rgba(245, 190, 20, 0.5);
+}
+
+.btn-gold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Glass card */
+.glass-card {
+  @apply rounded-2xl p-5;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+/* Shot glass animation */
+@keyframes shotPour {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(-30deg); }
+  60% { transform: rotate(-30deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.shot-animation {
+  animation: shotPour 1.2s ease-in-out;
+  display: inline-block;
+}
