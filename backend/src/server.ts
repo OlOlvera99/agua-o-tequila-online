@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { RoomManager } from './RoomManager';
@@ -11,6 +12,9 @@ const httpServer = createServer(app);
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map(s => s.trim());
+
+// Express CORS middleware
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 const io = new Server<ClientEvents, ServerEvents>(httpServer, {
   cors: {
