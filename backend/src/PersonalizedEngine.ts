@@ -22,8 +22,27 @@ export function generatePersonalizedAffirmations(
   const results: GeneratedAffirmation[] = [];
   const playerNames = players.map(p => p.name);
 
+  // ═══════════ DEBUG: Mostrar qué datos recibimos ═══════════
+  console.log(`🔍 PersonalizedEngine recibió:`);
+  console.log(`   Jugadores: ${playerNames.join(', ')}`);
+  console.log(`   Host secrets keys: ${JSON.stringify(Object.keys(hostSecrets))}`);
+  for (const [name, secret] of Object.entries(hostSecrets)) {
+    console.log(`   Secret "${name}": "${secret.substring(0, 80)}..."`);
+  }
+  for (const p of players) {
+    console.log(`   ${p.name}: profile=${!!p.profile}, bio="${p.profile?.bio?.substring(0, 50) || 'N/A'}", tags=${p.profile?.tags?.join(',') || 'N/A'}, rels=${p.profile?.relationships?.length || 0}`);
+    if (p.profile?.relationships) {
+      for (const r of p.profile.relationships) {
+        console.log(`      rel: ${r.targetName} (${r.type}) comment="${r.comment || ''}"`);
+      }
+    }
+  }
+
   for (const player of players) {
-    if (!player.profile) continue;
+    if (!player.profile) {
+      console.log(`   ⚠️ ${player.name} NO tiene profile, saltando`);
+      continue;
+    }
     const profile = player.profile;
     const name = player.name;
     const others = playerNames.filter(n => n !== name);
@@ -31,8 +50,12 @@ export function generatePersonalizedAffirmations(
     // ═══════════ PRIORIDAD 1: CHISME DEL HOST ═══════════
     const secret = hostSecrets[name];
     if (secret && secret.trim()) {
+      console.log(`   🎯 Procesando secret de ${name}: "${secret.substring(0, 80)}"`);
       const catalysts = generateCatalysts(name, secret, others, profile, players, level);
+      console.log(`   → Generó ${catalysts.length} catalizadores`);
       results.push(...catalysts.map(c => ({ ...c, priority: 100 })));
+    } else {
+      console.log(`   ❌ No hay secret para "${name}" (keys: ${Object.keys(hostSecrets).join(', ')})`);
     }
 
     // ═══════════ PRIORIDAD 2: COMENTARIOS DE RELACIONES ═══════════
@@ -76,6 +99,18 @@ export function generatePersonalizedAffirmations(
     return Math.random() - 0.5;
   });
 
+  // ═══════════ DEBUG RESUMEN ═══════════
+  console.log(`🔍 RESUMEN PersonalizedEngine:`);
+  console.log(`   Total: ${results.length} afirmaciones`);
+  console.log(`   Prioridad 100 (secrets): ${results.filter(r => r.priority === 100).length}`);
+  console.log(`   Prioridad 90 (rel comments): ${results.filter(r => r.priority === 90).length}`);
+  console.log(`   Prioridad 75 (bio): ${results.filter(r => r.priority === 75).length}`);
+  console.log(`   Prioridad 80-85 (rel type + cross): ${results.filter(r => (r.priority ?? 0) >= 80 && (r.priority ?? 0) < 90).length}`);
+  if (results.length > 0) {
+    console.log(`   Primeras 5:`);
+    results.slice(0, 5).forEach(r => console.log(`     [${r.priority}] ${r.text}`));
+  }
+
   return results;
 }
 
@@ -97,6 +132,21 @@ function generateCatalysts(
   // Detectar nombres mencionados en el texto
   const mentionedNames = contextNames.filter(n => t.includes(n.toLowerCase()));
   const randomOther = () => contextNames[Math.floor(Math.random() * contextNames.length)] || 'alguien';
+
+  // ═══════════ DEBUG CATALYST ═══════════
+  const themes: string[] = [];
+  if (/dinero|deb[eo]|prest[aó]|pag[oó]|deuda|cobr|200|100.*mil|lana|varo|feria/.test(t)) themes.push('dinero');
+  if (/alcohol|borracho|borracha|tomar|tomado|chup[aó]|peda|pedo|cerveza|tequila|vodka|beber|copa/.test(t)) themes.push('alcohol');
+  if (/estr[eé]s|trabaj|presion|presión|agotad|burnout|chamba|jale|cansad|hart[oa]/.test(t)) themes.push('estrés');
+  if (/peso|kilo|gordo|gorda|flaco|flaca|enflac|engord|dieta|cuerpo|gym|ejercicio|panz/.test(t)) themes.push('peso');
+  if (/novi[oa]|pareja|relaci[oó]n|anda[rn]|besar|beso|amor|gust[aá]|crush|enamor|sal[ie]r/.test(t)) themes.push('relación');
+  if (/ex[\s\-]|termin[aóo]|cortaron|ruptura|superar|olvidar|trona/.test(t)) themes.push('ex');
+  if (/mentir|mentira|minti[oó]|secret|escondi|oculta|engañ|no sabe/.test(t)) themes.push('mentira');
+  if (/celos|celoso|celosa|envidia|envidi/.test(t)) themes.push('celos');
+  if (/pap[aá]|mam[aá]|familia|padres|hermano|hermana|hijo|hija/.test(t)) themes.push('familia');
+  if (/pelea|pleito|discut|enojad|molest|bronca|problema/.test(t)) themes.push('pelea');
+  if (/infiel|cuerno|engañ[oó]|puso el cuerno/.test(t)) themes.push('infidelidad');
+  console.log(`   🧪 Catalyst para ${name}: text="${text.substring(0, 60)}" → temas=[${themes.join(',')}], mentioned=[${mentionedNames.join(',')}]`);
 
   // ═══════════ DINERO / DEUDA / PRÉSTAMO ═══════════
   if (/dinero|deb[eo]|prest[aó]|pag[oó]|deuda|cobr|200|100.*mil|lana|varo|feria/.test(t)) {
