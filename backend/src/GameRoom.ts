@@ -127,14 +127,52 @@ export class GameRoom {
     });
     this.shuffleArray(this.affirmationPool);
 
-    // ═══════════ GENERAR PERSONALIZADAS DEL CUESTIONARIO (TOP PRIORIDAD) ═══════════
+    // ═══════════ GENERAR PERSONALIZADAS POR REGEX (FALLBACK RÁPIDO) ═══════════
     this.personalizedPool = generatePersonalizedAffirmations(
       this.players,
       this.hostSecrets,
       this.settings.level,
     );
-    console.log(`📋 Pool personalizado: ${this.personalizedPool.length} afirmaciones generadas`);
-    console.log(`📋 Pool fallback: ${this.affirmationPool.length} afirmaciones genéricas`);
+    console.log(`📋 Pool personalizado (regex): ${this.personalizedPool.length} afirmaciones`);
+    console.log(`📋 Pool fallback (genérico): ${this.affirmationPool.length} afirmaciones`);
+  }
+
+  /** 
+   * Genera catalizadores inteligentes con Claude IA.
+   * Estos tienen MÁXIMA prioridad (110) y se basan en el texto libre del cuestionario.
+   * Se agregan al personalizedPool al inicio.
+   */
+  async generateAICatalysts(): Promise<boolean> {
+    if (!claude.isAvailable()) {
+      console.log('⚠️ Claude API no disponible, usando solo regex + fallback');
+      return false;
+    }
+
+    const playersWithProfiles = this.players
+      .filter(p => p.profile)
+      .map(p => ({ name: p.name, profile: p.profile! }));
+
+    if (playersWithProfiles.length === 0) return false;
+
+    try {
+      const catalysts = await claude.generateCatalystBatch(
+        playersWithProfiles,
+        this.hostSecrets,
+        this.settings.level,
+      );
+
+      if (catalysts.length > 0) {
+        // Insertar al INICIO del pool personalizado (máxima prioridad)
+        this.personalizedPool = [...catalysts, ...this.personalizedPool];
+        // Re-ordenar por prioridad
+        this.personalizedPool.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        console.log(`🤖 Pool final: ${this.personalizedPool.length} personalizadas (${catalysts.length} IA + ${this.personalizedPool.length - catalysts.length} regex)`);
+        return true;
+      }
+    } catch (err) {
+      console.error('Error generando catalizadores IA:', err);
+    }
+    return false;
   }
 
   /** Genera afirmaciones con IA (adaptativas) */

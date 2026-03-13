@@ -19,7 +19,8 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 const io = new Server<ClientEvents, ServerEvents>(httpServer, {
   cors: {
     origin: allowedOrigins,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -128,11 +129,14 @@ io.on('connection', (socket) => {
 
     // Si estamos en cuestionario → verificar que todos llenaron e iniciar juego
     if (room.phase === 'questionnaire') {
-      // Generar fallback pool siempre
+      // Generar fallback pool siempre (regex + genéricas)
       room.generateFallbackPool();
 
-      // Intentar generar con IA
+      // Intentar generar catalizadores inteligentes con IA (MÁXIMA PRIORIDAD)
       io.to(roomId).emit('GENERATING_AFFIRMATIONS');
+      await room.generateAICatalysts();
+
+      // También generar batch adaptativo por turno
       await room.generateAIBatch();
 
       startTurn(room, roomId);
