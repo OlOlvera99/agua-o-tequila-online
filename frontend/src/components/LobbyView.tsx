@@ -69,13 +69,13 @@ export default function LobbyView({ game }: { game: any }) {
       )}
 
       {/* Players */}
-      <div className="glass-card flex-1 mb-6">
+      <div className="glass-card mb-6">
         <div className="flex justify-between items-center mb-3">
           <span className="text-gray-400 text-sm">Jugadores</span>
           <span className="text-gold font-bold">{players.length}/12</span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[40vh] overflow-y-auto">
           {players.map((p: any, i: number) => (
             <div
               key={p.socketId}

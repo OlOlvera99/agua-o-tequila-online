@@ -18,9 +18,16 @@ body {
 }
 
 /* Prevent pull to refresh on mobile */
-html, body {
+html {
   overflow: hidden;
   height: 100dvh;
+}
+
+body {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 #__next {
