@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function LandingView({ game }: { game: any }) {
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
@@ -9,6 +9,19 @@ export default function LandingView({ game }: { game: any }) {
   const [level, setLevel] = useState<'suave' | 'picante' | 'extrema'>('picante');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // ═══════════ AUTO-DETECT ROOM CODE FROM URL ═══════════
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get('room');
+    if (roomCode) {
+      setCode(roomCode.toUpperCase());
+      setMode('join');
+      // Limpiar URL para que no se quede el ?room=
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const handleCreate = async () => {
     if (!name.trim()) return setError('Escribe tu nombre');
