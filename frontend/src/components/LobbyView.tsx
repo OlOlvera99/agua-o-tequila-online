@@ -19,7 +19,7 @@ export default function LobbyView({ game }: { game: any }) {
     if (navigator.share) {
       navigator.share({
         title: 'Agua o Tequila 🥃',
-        text: `Únete a mi sala: ${game.roomId}`,
+        text: '¡Únete a jugar!',
         url: shareUrl,
       });
     } else {
