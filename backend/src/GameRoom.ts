@@ -127,13 +127,14 @@ export class GameRoom {
     });
     this.shuffleArray(this.affirmationPool);
 
-    // ═══════════ GENERAR PERSONALIZADAS POR REGEX (FALLBACK RÁPIDO) ═══════════
+    // ═══════════ GENERAR PERSONALIZADAS (regex + virales) ═══════════
     this.personalizedPool = generatePersonalizedAffirmations(
       this.players,
       this.hostSecrets,
       this.settings.level,
     );
-    console.log(`📋 Pool personalizado (regex): ${this.personalizedPool.length} afirmaciones`);
+
+    console.log(`📋 Pool personalizado: ${this.personalizedPool.length} afirmaciones`);
     console.log(`📋 Pool fallback (genérico): ${this.affirmationPool.length} afirmaciones`);
   }
 

@@ -277,6 +277,15 @@ ${level === 'suave' ? 'Divertidas y ligeras, sin temas sexuales explícitos' : '
 ${level === 'picante' ? 'Incómodas, provocadoras, secretos, coqueteo' : ''}
 ${level === 'extrema' ? 'Extremas, tabú, empujar límites sin vulgaridad explícita' : ''}
 
+## REGLA CRÍTICA SOBRE SECRETOS
+El chisme del host sobre un jugador genera afirmaciones para EL TURNO DE ESE JUGADOR, no del host.
+- Si el host escribió sobre Jorge: "le puso el cuerno a su ex" → genera afirmación para el turno de Jorge
+- targetPlayer SIEMPRE = el jugador sobre el que se escribió el chisme
+- La afirmación debe ser algo que EL JUGADOR sabe si es verdad/mentira, y los DEMÁS tienen que adivinar
+- NUNCA generes "X sabe algo de Y" porque el host SIEMPRE sabe y eso lo hace obvio
+- BIEN: "Jorge ha perdonado una infidelidad" (Jorge sabe, los demás adivinan)
+- MAL: "Ricardo sabe algo de Jorge que podría arruinar la amistad" (obvio para Ricardo)
+
 ## REGLAS
 1. Genera ${numPerPlayer} afirmaciones POR JUGADOR (${numPerPlayer * players.length} total)
 2. PRIORIZA el material escrito (chisme del host, comentarios de relación, bio) — cada afirmación debe estar INSPIRADA en algo que alguien escribió
@@ -288,6 +297,27 @@ ${level === 'extrema' ? 'Extremas, tabú, empujar límites sin vulgaridad explí
 8. Español informal mexicano
 9. Mezcla: ~40% generales, ~60% interpersonales
 10. NUNCA repitas literalmente lo que escribieron — TRANSFORMA la info en algo que provoque conversación
+11. Las afirmaciones deben ser DIFÍCILES de adivinar y deben PROVOCAR DISCUSIÓN entre los jugadores
+
+## EJEMPLOS DE AFIRMACIONES VIRALES QUE FUNCIONAN (úsalas como inspiración de TONO y ESTILO)
+Para mejores amigos hombres:
+- "Jorge es más probable a ser funado que Ricardo"
+- "Si Jorge y Ricardo se agarran a golpes, Jorge ganaría"
+- "Si nadie se entera, Jorge le daría un beso a Ricardo"
+- "Jorge va a terminar más pelón que Ricardo"
+- "Si Jorge viera a Ricardo siendo infiel a su novia, le diría"
+- "Si Jorge fuera gay, andaría con Ricardo"
+
+Para mejores amigas mujeres:
+- "María es más guapa que Laura"
+- "María le ha tirado mierda a Laura a sus espaldas"
+- "Si María fuera lesbiana andaría con Laura"
+- "María tiene gustos más culeros que Laura"
+
+Para amigo y amiga:
+- "Si la novia de Jorge se lo pide, dejaría de hablar con María"
+- "Jorge se ha masturbado pensando en María"
+- "A María le gustaría un novio como Jorge"
 
 ## FORMATO (JSON estricto, nada más)
 {"affirmations": [
