@@ -355,10 +355,14 @@ export class GameRoom {
     const voters = this.players.filter(p => p.socketId !== this.getCurrentPlayerId());
     const currentPlayer = this.players[this.currentPlayerIndex];
 
+    // Fallback: si por algún edge case el jugador no votó, asignar la respuesta INCORRECTA.
+    // (Normalmente forceGuessTimeout ya seteó currentGuess antes de llegar aquí.)
+    const wrongAnswer: 'verdad' | 'mentira' = truthAnswer === 'verdad' ? 'mentira' : 'verdad';
+
     const guesses = voters.map(p => ({
       playerName: p.name,
-      guess: p.currentGuess || truthAnswer === 'verdad' ? 'mentira' : 'verdad' as 'verdad' | 'mentira',
-      correct: p.currentGuess === truthAnswer
+      guess: (p.currentGuess ?? wrongAnswer) as 'verdad' | 'mentira',
+      correct: p.currentGuess === truthAnswer,
     }));
 
     const allCorrect = guesses.every(g => g.correct);

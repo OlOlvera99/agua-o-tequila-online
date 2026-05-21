@@ -26,39 +26,78 @@ const io = new Server<ClientEvents, ServerEvents>(httpServer, {
 
 const roomManager = new RoomManager();
 
+// ═══════════ HEALTH CHECK ═══════════
 app.get('/', (_req, res) => {
-  res.json({ status: 'ok', rooms: roomManager.getRoomCount() });
+  res.json({ status: 'ok' });
 });
 
-// Debug endpoint — ver estado completo de una sala
-app.get('/debug/:roomId', (_req, res) => {
-  const room = roomManager.getRoom(_req.params.roomId.toUpperCase());
-  if (!room) return res.json({ error: 'Sala no encontrada' });
+// ═══════════ DEBUG ENDPOINT (solo en desarrollo) ═══════════
+// En producción expone perfiles privados, chismes del host, etc. — bloqueado.
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug/:roomId', (_req, res) => {
+    const room = roomManager.getRoom(_req.params.roomId.toUpperCase());
+    if (!room) return res.json({ error: 'Sala no encontrada' });
 
-  res.json({
-    id: room.id,
-    phase: room.phase,
-    round: room.round,
-    playerCount: room.players.length,
-    players: room.players.map(p => ({
-      name: p.name,
-      isHost: p.isHost,
-      questionnaireReady: p.questionnaireReady,
-      hasProfile: !!p.profile,
-      profile: p.profile,
-    })),
-    hostSecrets: room.hostSecrets,
-    currentAffirmation: room.currentAffirmation,
-    currentAffirmationType: room.currentAffirmationType,
-    personalizedPoolSize: room.personalizedPool?.length ?? 0,
-    personalizedPool: room.personalizedPool?.map(a => ({
-      text: a.text, type: a.type, target: a.targetPlayer, involved: a.involvedPlayer, priority: a.priority
-    })) ?? [],
-    aiPoolSize: room.aiPool?.length ?? 0,
-    fallbackPoolSize: room.affirmationPool?.length ?? 0,
-    usedCount: room.usedAffirmations?.size ?? 0,
+    res.json({
+      id: room.id,
+      phase: room.phase,
+      round: room.round,
+      playerCount: room.players.length,
+      players: room.players.map(p => ({
+        name: p.name,
+        isHost: p.isHost,
+        questionnaireReady: p.questionnaireReady,
+        hasProfile: !!p.profile,
+        profile: p.profile,
+      })),
+      hostSecrets: room.hostSecrets,
+      currentAffirmation: room.currentAffirmation,
+      currentAffirmationType: room.currentAffirmationType,
+      personalizedPoolSize: room.personalizedPool?.length ?? 0,
+      personalizedPool: room.personalizedPool?.map(a => ({
+        text: a.text, type: a.type, target: a.targetPlayer, involved: a.involvedPlayer, priority: a.priority
+      })) ?? [],
+      aiPoolSize: room.aiPool?.length ?? 0,
+      fallbackPoolSize: room.affirmationPool?.length ?? 0,
+      usedCount: room.usedAffirmations?.size ?? 0,
+    });
   });
-});
+}
+
+// ═══════════ VALIDACIÓN DE INPUT ═══════════
+const LIMITS = {
+  playerName: 30,
+  roomId: 12,
+  bio: 500,
+  secret: 1000,
+  comment: 200,
+  tags: 20,
+  contextSettings: 1000,
+};
+
+function sanitizeStr(s: unknown, maxLen: number): string | null {
+  if (typeof s !== 'string') return null;
+  const trimmed = s.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > maxLen) return null;
+  return trimmed;
+}
+
+// ═══════════ RATE LIMIT CASERO POR SOCKET ═══════════
+// Tope simple: máx N acciones en una ventana de tiempo.
+const rateLimits = new Map<string, number[]>(); // socketId → timestamps
+
+function checkRate(socketId: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimits.get(socketId) || []).filter(t => now - t < windowMs);
+  if (timestamps.length >= max) {
+    rateLimits.set(socketId, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  rateLimits.set(socketId, timestamps);
+  return true;
+}
 
 io.on('connection', (socket) => {
   console.log(`🔌 Conectado: ${socket.id}`);
@@ -66,21 +105,35 @@ io.on('connection', (socket) => {
   // ═══════════ LOBBY ═══════════
 
   socket.on('CREATE_ROOM', ({ playerName, settings }, callback) => {
-    const room = roomManager.createRoom(socket.id, playerName, settings);
+    if (!checkRate(socket.id, 3, 60_000)) {
+      return callback({ roomId: '' } as any); // silent fail por ahora; el cliente debería ignorar
+    }
+    const name = sanitizeStr(playerName, LIMITS.playerName);
+    if (!name) return callback({ roomId: '' } as any);
+
+    const room = roomManager.createRoom(socket.id, name, settings || {});
     socket.join(room.id);
     callback({ roomId: room.id });
     io.to(room.id).emit('ROOM_UPDATE', room.getLobbyState());
   });
 
   socket.on('JOIN_ROOM', ({ roomId, playerName }, callback) => {
-    const id = roomId.toUpperCase();
+    if (!checkRate(socket.id, 10, 60_000)) {
+      return callback({ error: 'Demasiados intentos, espera un momento' });
+    }
+    const cleanRoomId = sanitizeStr(roomId, LIMITS.roomId);
+    const name = sanitizeStr(playerName, LIMITS.playerName);
+    if (!cleanRoomId) return callback({ error: 'Código de sala inválido' });
+    if (!name) return callback({ error: 'Nombre inválido' });
+
+    const id = cleanRoomId.toUpperCase();
     const room = roomManager.getRoom(id);
     if (!room) return callback({ error: 'Sala no encontrada' });
     if (room.phase !== 'lobby') return callback({ error: 'Juego ya iniciado' });
     if (room.players.length >= 12) return callback({ error: 'Sala llena (máx 12)' });
-    if (room.players.some(p => p.name === playerName)) return callback({ error: 'Nombre en uso' });
+    if (room.players.some(p => p.name === name)) return callback({ error: 'Nombre en uso' });
 
-    room.addPlayer(socket.id, playerName);
+    room.addPlayer(socket.id, name);
     socket.join(id);
     callback({ success: true });
     io.to(id).emit('ROOM_UPDATE', room.getLobbyState());
@@ -89,16 +142,57 @@ io.on('connection', (socket) => {
   socket.on('UPDATE_SETTINGS', ({ roomId, settings }) => {
     const room = roomManager.getRoom(roomId);
     if (!room || room.hostId !== socket.id) return;
-    room.updateSettings(settings);
+    if (!settings || typeof settings !== 'object') return;
+    // Limpiar settings antes de pasar
+    const cleaned: any = {};
+    if (settings.level && ['suave', 'picante', 'extrema'].includes(settings.level)) {
+      cleaned.level = settings.level;
+    }
+    if (typeof settings.context === 'string') {
+      cleaned.context = settings.context.slice(0, LIMITS.contextSettings);
+    }
+    room.updateSettings(cleaned);
     io.to(roomId).emit('ROOM_UPDATE', room.getLobbyState());
   });
 
   // ═══════════ CUESTIONARIO ═══════════
 
   socket.on('SUBMIT_PROFILE', ({ roomId, profile }) => {
+    if (!checkRate(socket.id, 5, 60_000)) return;
     const room = roomManager.getRoom(roomId);
     if (!room) return;
-    room.submitProfile(socket.id, profile);
+    if (!profile || typeof profile !== 'object') return;
+
+    // Validar/sanitizar perfil
+    const validGenders = ['hombre', 'mujer', 'otro'];
+    const validOrientations = ['heterosexual', 'homosexual', 'bisexual', 'prefiero no decir'];
+    const cleanProfile = {
+      gender: validGenders.includes(profile.gender) ? profile.gender : 'otro',
+      orientation: validOrientations.includes(profile.orientation) ? profile.orientation : 'prefiero no decir',
+      tags: Array.isArray(profile.tags)
+        ? profile.tags
+            .filter((t: any) => typeof t === 'string' && t.length <= LIMITS.tags)
+            .slice(0, 15)
+        : [],
+      bio: typeof profile.bio === 'string' ? profile.bio.slice(0, LIMITS.bio) : '',
+      relationships: Array.isArray(profile.relationships)
+        ? profile.relationships
+            .filter((r: any) =>
+              typeof r === 'object' &&
+              typeof r.targetName === 'string' &&
+              r.targetName.length <= LIMITS.playerName &&
+              typeof r.type === 'string'
+            )
+            .map((r: any) => ({
+              targetName: r.targetName,
+              type: r.type,
+              comment: typeof r.comment === 'string' ? r.comment.slice(0, LIMITS.comment) : '',
+            }))
+            .slice(0, 11) // máx 11 relaciones (uno menos del límite de 12 jugadores)
+        : [],
+    };
+
+    room.submitProfile(socket.id, cleanProfile as any);
 
     const progress = room.getQuestionnaireProgress();
     io.to(roomId).emit('QUESTIONNAIRE_PROGRESS', progress);
@@ -108,7 +202,17 @@ io.on('connection', (socket) => {
   socket.on('SUBMIT_HOST_SECRETS', ({ roomId, secrets }) => {
     const room = roomManager.getRoom(roomId);
     if (!room || room.hostId !== socket.id) return;
-    room.setHostSecrets(secrets);
+    if (!secrets || typeof secrets !== 'object') return;
+
+    // Sanitizar: cada secret max length, solo strings
+    const cleanSecrets: Record<string, string> = {};
+    for (const [name, secret] of Object.entries(secrets)) {
+      if (typeof name === 'string' && name.length <= LIMITS.playerName &&
+          typeof secret === 'string' && secret.length <= LIMITS.secret) {
+        cleanSecrets[name] = secret;
+      }
+    }
+    room.setHostSecrets(cleanSecrets);
   });
 
   // ═══════════ INICIAR JUEGO ═══════════
