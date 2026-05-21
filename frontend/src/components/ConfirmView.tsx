@@ -51,13 +51,11 @@ export default function ConfirmView({ game }: { game: any }) {
         <p className="text-ink-soft text-sm mb-4 font-medium">¿Esto es verdad sobre ti?</p>
 
         <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-          <button onClick={() => game.confirmTruth(true)} className="vote-truth">
-            <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Agua</span>
-            <span>Verdad</span>
+          <button onClick={() => game.confirmTruth(true)} className="vote-yes">
+            <span>Sí</span>
           </button>
-          <button onClick={() => game.confirmTruth(false)} className="vote-lie">
-            <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Tequila</span>
-            <span>Mentira</span>
+          <button onClick={() => game.confirmTruth(false)} className="vote-no">
+            <span>No</span>
           </button>
         </div>
 
