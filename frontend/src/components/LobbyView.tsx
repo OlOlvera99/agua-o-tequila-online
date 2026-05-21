@@ -18,7 +18,7 @@ export default function LobbyView({ game }: { game: any }) {
   const shareLink = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Agua o Tequila 🥃',
+        title: 'Agua o Tequila',
         text: '¡Únete a jugar!',
         url: shareUrl,
       });
@@ -32,99 +32,99 @@ export default function LobbyView({ game }: { game: any }) {
   const players = game.roomState?.players || [];
   const settings = game.roomState?.settings;
 
+  const levelLabel = settings?.level === 'suave' ? 'Suave'
+    : settings?.level === 'picante' ? 'Picante'
+    : settings?.level === 'extrema' ? 'Extrema'
+    : '';
+
   return (
-    <div className="min-h-[100dvh] flex flex-col px-6 py-8">
-      {/* Header */}
+    <div className="min-h-[100dvh] flex flex-col px-6 py-8 max-w-md mx-auto w-full">
       <div className="text-center mb-6">
-        <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Sala</p>
+        <img
+          src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+          alt=""
+          className="w-14 mx-auto mb-3"
+        />
+        <p className="text-ink-soft text-[11px] uppercase tracking-[0.2em] font-semibold mb-2">
+          Sala
+        </p>
         <button
           onClick={copyCode}
-          className="text-3xl font-black text-gold font-mono tracking-widest hover:text-gold-light transition"
+          className="text-3xl font-black text-ink font-mono tracking-[0.15em] hover:text-water transition"
         >
           {game.roomId}
         </button>
-        <p className="text-gray-500 text-xs mt-1">
-          {copied ? '✅ Copiado' : 'Toca para copiar'}
+        <p className="text-ink-faint text-xs mt-1">
+          {copied ? 'Copiado' : 'Toca para copiar'}
         </p>
       </div>
 
-      {/* Share button */}
-      <button
-        onClick={shareLink}
-        className="w-full py-3 rounded-xl bg-gray-800 border border-gray-700 text-white font-bold mb-6 hover:border-gold transition active:scale-95"
-      >
-        📤 Compartir link de invitación
+      <button onClick={shareLink} className="btn-ghost mb-6">
+        Compartir link de invitación
       </button>
 
-      {/* Level */}
       {settings && (
-        <div className="glass-card mb-4 flex items-center justify-between">
-          <span className="text-gray-400 text-sm">Nivel</span>
-          <span className="font-bold">
-            {settings.level === 'suave' && '🟢 Suave'}
-            {settings.level === 'picante' && '🟡 Picante'}
-            {settings.level === 'extrema' && '🔴 Extrema'}
-          </span>
+        <div className="lg-card-sm px-5 py-3.5 mb-3 flex items-center justify-between">
+          <span className="text-ink-soft text-sm font-medium">Nivel</span>
+          <span className="font-bold text-ink">{levelLabel}</span>
         </div>
       )}
 
-      {/* Players */}
-      <div className="glass-card mb-6">
+      <div className="lg-card mb-6">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-gray-400 text-sm">Jugadores</span>
-          <span className="text-gold font-bold">{players.length}/12</span>
+          <span className="text-ink-soft text-sm font-medium">Jugadores</span>
+          <span className="text-water font-black">{players.length}/12</span>
         </div>
 
         <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-          {players.map((p: any, i: number) => (
-            <div
-              key={p.socketId}
-              className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg animate-slide-up"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">
-                  {p.isHost ? '👑' : '🎮'}
-                </span>
-                <span className={`font-medium ${
-                  p.socketId === game.mySocketId ? 'text-gold' : 'text-white'
-                }`}>
-                  {p.name}
-                  {p.socketId === game.mySocketId && ' (tú)'}
-                </span>
+          {players.map((p: any, i: number) => {
+            const isMe = p.socketId === game.mySocketId;
+            return (
+              <div
+                key={p.socketId}
+                className="flex items-center justify-between py-2.5 px-3.5 bg-white/65 backdrop-blur-md rounded-xl border border-white/80 animate-slide-up"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${p.isHost ? 'bg-tequila' : 'bg-water'}`} />
+                  <span className={`font-semibold text-sm ${isMe ? 'text-water-deep' : 'text-ink'}`}>
+                    {p.name}{isMe && ' (tú)'}
+                  </span>
+                </div>
+                {p.isHost && (
+                  <span className="text-[10px] uppercase tracking-wider text-tequila-deep bg-tequila/15 px-2 py-0.5 rounded-full font-bold">
+                    host
+                  </span>
+                )}
               </div>
-              {p.isHost && (
-                <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded">host</span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {players.length < 2 && (
-          <p className="text-gray-500 text-xs text-center mt-4">
+          <p className="text-ink-faint text-xs text-center mt-4">
             Necesitas al menos 2 jugadores para empezar
           </p>
         )}
       </div>
 
-      {/* Start button (host only) */}
       {game.isHost && (
         <button
           onClick={game.startGame}
           disabled={players.length < 2}
-          className="btn-gold w-full text-lg"
+          className="btn-tequila text-base"
         >
-          {players.length < 2 ? 'Esperando jugadores...' : '🥃 ¡A Jugar!'}
+          {players.length < 2 ? 'Esperando jugadores…' : '¡A jugar!'}
         </button>
       )}
 
       {!game.isHost && (
         <div className="text-center py-4">
-          <p className="text-gray-400 text-sm">Esperando a que el host inicie...</p>
-          <div className="mt-2 flex justify-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '200ms' }} />
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '400ms' }} />
+          <p className="text-ink-soft text-sm font-medium">Esperando a que el host inicie…</p>
+          <div className="mt-3 flex justify-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '200ms' }} />
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '400ms' }} />
           </div>
         </div>
       )}

@@ -4,9 +4,26 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        gold: '#f5be14',
-        'gold-dark': '#d4a512',
-        'gold-light': '#ffd84d',
+        water: {
+          DEFAULT: '#3B7BA8',
+          light: '#7EB5DB',
+          deep: '#1E4D75',
+        },
+        tequila: {
+          DEFAULT: '#D89B3F',
+          light: '#F5C76A',
+          deep: '#A86F1C',
+        },
+        ink: {
+          DEFAULT: '#0F1419',
+          soft: '#5C6873',
+          faint: '#94A3B0',
+          hint: '#C7D0DA',
+        },
+        paper: {
+          DEFAULT: '#FAFBFD',
+          white: '#FFFFFF',
+        },
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

@@ -11,31 +11,37 @@ import RevealView from '@/components/RevealView';
 export default function Home() {
   const game = useGameSocket();
 
-  // Connection indicator
   if (!game.connected) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gray-900 px-6">
-        <div className="text-4xl mb-4 animate-pulse-slow">🥃</div>
-        <p className="text-gray-400 text-sm">Conectando...</p>
-      </div>
+      <main className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
+        <img
+          src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+          alt=""
+          className="w-24 mb-6 liquid-float"
+        />
+        <p className="text-ink-soft text-sm font-medium">Conectando…</p>
+      </main>
     );
   }
 
-  // Loading AI generation
   if (game.isGenerating) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gray-900 px-6">
-        <div className="text-5xl mb-4 animate-pulse-slow">🧠</div>
-        <p className="text-gold font-bold text-lg mb-2">Generando preguntas...</p>
-        <p className="text-gray-400 text-sm text-center">
+      <main className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
+        <img
+          src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+          alt=""
+          className="w-28 mb-6 liquid-float"
+        />
+        <p className="text-ink font-bold text-lg mb-2">Generando preguntas…</p>
+        <p className="text-ink-soft text-sm text-center max-w-xs">
           La IA está creando afirmaciones personalizadas para tu grupo
         </p>
-      </div>
+      </main>
     );
   }
 
   return (
-    <main className="min-h-[100dvh] bg-gray-900">
+    <main className="min-h-[100dvh]">
       {game.phase === 'landing' && <LandingView game={game} />}
       {game.phase === 'lobby' && <LobbyView game={game} />}
       {game.phase === 'questionnaire' && <QuestionnaireView game={game} />}

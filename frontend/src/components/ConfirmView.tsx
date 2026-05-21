@@ -5,87 +5,88 @@ export default function ConfirmView({ game }: { game: any }) {
 
   if (!turnData) return null;
 
-  // ═══════════ SOY EL DEL TURNO → VEO LA AFIRMACIÓN ═══════════
   if (isMyTurn) {
     if (hasConfirmed) {
       return (
         <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
-          <div className="text-5xl mb-4">🤫</div>
-          <p className="text-gold font-bold text-lg mb-2">Respuesta guardada</p>
-          <p className="text-gray-400 text-sm text-center">
-            Los demás están viendo la afirmación y votando...
+          <img
+            src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+            alt=""
+            className="w-16 mb-5 liquid-float"
+          />
+          <p className="text-ink font-black text-lg mb-1.5">Respuesta guardada</p>
+          <p className="text-ink-soft text-sm text-center font-medium max-w-xs">
+            Los demás están viendo la afirmación y votando…
           </p>
-          <div className="mt-4 flex gap-1">
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '200ms' }} />
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '400ms' }} />
+          <div className="mt-5 flex gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '200ms' }} />
+            <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '400ms' }} />
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
-        {/* Round counter */}
-        <div className="absolute top-6 right-6 text-gray-500 text-sm font-mono">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-8">
+        <div className="absolute top-5 right-5 text-ink-soft text-xs font-mono font-bold bg-white/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/80">
           Ronda {turnData.round}
         </div>
 
-        <p className="text-gray-400 text-sm uppercase tracking-widest mb-2">Es tu turno</p>
-        <div className="text-4xl mb-6">👀</div>
+        <p className="text-ink-soft text-[11px] uppercase tracking-[0.2em] font-semibold mb-2">
+          Es tu turno
+        </p>
 
-        {/* Affirmation card */}
-        <div className="glass-card w-full max-w-sm mb-8 animate-fade-in">
+        <div className="lg-hero w-full max-w-sm mb-8 animate-fade-in">
           {turnData.type === 'interpersonal' && (
-            <span className="text-xs text-gold/60 uppercase tracking-wider mb-2 block">Interpersonal</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-water font-bold mb-2 block">
+              Interpersonal
+            </span>
           )}
-          <p className="text-white text-xl font-bold text-center leading-relaxed">
-            "{turnData.affirmation}"
+          <p className="text-ink text-xl font-bold text-center leading-relaxed">
+            “{turnData.affirmation}”
           </p>
         </div>
 
-        {/* Question */}
-        <p className="text-gray-300 text-sm mb-4">¿Esto es verdad sobre ti?</p>
+        <p className="text-ink-soft text-sm mb-4 font-medium">¿Esto es verdad sobre ti?</p>
 
-        {/* Truth/Lie buttons */}
         <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-          <button
-            onClick={() => game.confirmTruth(true)}
-            className="py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg transition-all active:scale-95"
-          >
-            ✅ Sí, verdad
+          <button onClick={() => game.confirmTruth(true)} className="vote-truth">
+            <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Agua</span>
+            <span>Verdad</span>
           </button>
-          <button
-            onClick={() => game.confirmTruth(false)}
-            className="py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-lg transition-all active:scale-95"
-          >
-            ❌ No, mentira
+          <button onClick={() => game.confirmTruth(false)} className="vote-lie">
+            <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Tequila</span>
+            <span>Mentira</span>
           </button>
         </div>
 
-        <p className="text-gray-600 text-xs mt-4 text-center">
+        <p className="text-ink-faint text-xs mt-4 text-center">
           Solo tú y el servidor saben tu respuesta
         </p>
       </div>
     );
   }
 
-  // ═══════════ NO SOY DEL TURNO → ESPERANDO ═══════════
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
-      <div className="absolute top-6 right-6 text-gray-500 text-sm font-mono">
+      <div className="absolute top-5 right-5 text-ink-soft text-xs font-mono font-bold bg-white/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/80">
         Ronda {turnData.round}
       </div>
 
-      <div className="text-5xl mb-4 animate-pulse-slow">🤔</div>
-      <p className="text-gold font-bold text-xl mb-2">{turnData.currentPlayer}</p>
-      <p className="text-gray-400 text-sm text-center">
-        está leyendo la afirmación...
+      <img
+        src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+        alt=""
+        className="w-20 mb-4 animate-pulse-slow"
+      />
+      <p className="text-ink font-black text-xl mb-1">{turnData.currentPlayer}</p>
+      <p className="text-ink-soft text-sm text-center font-medium">
+        está leyendo la afirmación…
       </p>
-      <div className="mt-6 flex gap-1">
-        <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-        <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '200ms' }} />
-        <div className="w-2 h-2 rounded-full bg-gold animate-pulse" style={{ animationDelay: '400ms' }} />
+      <div className="mt-6 flex gap-1.5">
+        <div className="w-2 h-2 rounded-full bg-water animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '200ms' }} />
+        <div className="w-2 h-2 rounded-full bg-water animate-pulse" style={{ animationDelay: '400ms' }} />
       </div>
     </div>
   );

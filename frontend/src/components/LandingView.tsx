@@ -10,7 +10,6 @@ export default function LandingView({ game }: { game: any }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ═══════════ AUTO-DETECT ROOM CODE FROM URL ═══════════
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -18,7 +17,6 @@ export default function LandingView({ game }: { game: any }) {
     if (roomCode) {
       setCode(roomCode.toUpperCase());
       setMode('join');
-      // Limpiar URL para que no se quede el ?room=
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -51,110 +49,109 @@ export default function LandingView({ game }: { game: any }) {
   if (mode === 'menu') {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
-        <div className="text-6xl mb-2">🥃</div>
-        <h1 className="text-3xl font-black text-gold mb-1">Agua o Tequila</h1>
-        <p className="text-gray-400 text-sm mb-10">¿Verdad o mentira? Quien falla, toma.</p>
+        <img
+          src="/brand/Logotipo_AGUA_TEQUILA_TRANSPARENTE.png"
+          alt="Agua o Tequila"
+          className="w-72 max-w-[80vw] mb-2 liquid-float drop-shadow-xl"
+        />
+        <p className="text-ink-soft text-sm font-medium mb-12 text-center">
+          ¿Verdad o mentira? Quien falla, toma.
+        </p>
 
         <div className="w-full max-w-xs space-y-3">
-          <button
-            onClick={() => setMode('create')}
-            className="btn-gold w-full text-lg"
-          >
-            Crear Sala
+          <button onClick={() => setMode('create')} className="btn-water text-base">
+            Crear sala
           </button>
-          <button
-            onClick={() => setMode('join')}
-            className="w-full py-3 px-6 rounded-xl font-bold border-2 border-gray-600 text-gray-300 hover:border-gold hover:text-gold transition-all active:scale-95"
-          >
-            Unirme a Sala
+          <button onClick={() => setMode('join')} className="btn-ghost text-base">
+            Unirme a sala
           </button>
         </div>
 
-        <p className="text-gray-600 text-xs mt-8">by Mati Media</p>
+        <p className="text-ink-faint text-[10px] mt-10 uppercase tracking-[0.2em]">
+          by Mati Media
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-8 relative">
       <button
         onClick={() => { setMode('menu'); setError(''); }}
-        className="absolute top-4 left-4 text-gray-400 hover:text-white text-sm"
+        className="absolute top-5 left-5 text-ink-soft hover:text-ink text-sm font-medium px-3 py-1.5 rounded-full bg-white/60 backdrop-blur-md border border-ink/10 transition"
       >
         ← Atrás
       </button>
 
-      <div className="text-4xl mb-4">{mode === 'create' ? '🎉' : '🔗'}</div>
-      <h2 className="text-2xl font-bold text-white mb-6">
-        {mode === 'create' ? 'Crear Sala' : 'Unirme a Sala'}
+      <img
+        src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+        alt=""
+        className="w-20 mb-4"
+      />
+      <h2 className="text-2xl font-black text-ink mb-8">
+        {mode === 'create' ? 'Crear sala' : 'Unirme a sala'}
       </h2>
 
       <div className="w-full max-w-xs space-y-4">
-        {/* Nombre */}
         <div>
-          <label className="text-gray-400 text-xs uppercase tracking-wider mb-1 block">Tu nombre</label>
+          <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
+            Tu nombre
+          </label>
           <input
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="¿Cómo te llaman?"
             maxLength={15}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gold focus:outline-none transition"
+            className="lg-input"
           />
         </div>
 
-        {/* Código de sala (solo para unirse) */}
         {mode === 'join' && (
           <div>
-            <label className="text-gray-400 text-xs uppercase tracking-wider mb-1 block">Código de sala</label>
+            <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
+              Código de sala
+            </label>
             <input
               type="text"
               value={code}
               onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="Ej: RJZD96KUL9"
+              placeholder="EJ: RJZD96KUL9"
               maxLength={10}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gold focus:outline-none transition font-mono text-center tracking-widest"
+              className="lg-input font-mono text-center tracking-[0.2em]"
             />
           </div>
         )}
 
-        {/* Nivel (solo para crear) */}
         {mode === 'create' && (
           <div>
-            <label className="text-gray-400 text-xs uppercase tracking-wider mb-1 block">Nivel</label>
+            <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
+              Nivel
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {(['suave', 'picante', 'extrema'] as const).map((l) => (
                 <button
                   key={l}
                   onClick={() => setLevel(l)}
-                  className={`py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-                    level === l
-                      ? 'bg-gold text-gray-900'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
+                  className={`seg ${level === l ? 'seg-active' : ''}`}
                 >
-                  {l === 'suave' && '🟢'}
-                  {l === 'picante' && '🟡'}
-                  {l === 'extrema' && '🔴'}
-                  {' '}{l.charAt(0).toUpperCase() + l.slice(1)}
+                  {l.charAt(0).toUpperCase() + l.slice(1)}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Error */}
         {error && (
-          <p className="text-red-400 text-sm text-center animate-shake">{error}</p>
+          <p className="text-red-500 text-sm text-center font-medium animate-shake">{error}</p>
         )}
 
-        {/* Submit */}
         <button
           onClick={mode === 'create' ? handleCreate : handleJoin}
           disabled={loading}
-          className="btn-gold w-full text-lg"
+          className="btn-water text-base mt-2"
         >
-          {loading ? '...' : mode === 'create' ? '🎮 Crear' : '🚀 Unirme'}
+          {loading ? 'Cargando…' : mode === 'create' ? 'Crear' : 'Unirme'}
         </button>
       </div>
     </div>

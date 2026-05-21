@@ -10,7 +10,6 @@ export default function RevealView({ game }: { game: any }) {
   const [countdown, setCountdown] = useState(3);
   const [autoTimer, setAutoTimer] = useState(10);
 
-  // Countdown animation: 3...2...1...REVEAL
   useEffect(() => {
     setShowResult(false);
     setShowDrinkers(false);
@@ -33,7 +32,6 @@ export default function RevealView({ game }: { game: any }) {
     return () => clearInterval(cd);
   }, [revealData]);
 
-  // Auto-advance timer (10s after full reveal)
   useEffect(() => {
     if (!showScoreboard) return;
     setAutoTimer(10);
@@ -49,115 +47,137 @@ export default function RevealView({ game }: { game: any }) {
   if (!revealData || !turnData) return null;
 
   const reasonText: Record<string, string> = {
-    all_correct: '¡Todos acertaron! 😱',
-    all_wrong: '¡Todos fallaron! 😂',
+    all_correct: '¡Todos acertaron!',
+    all_wrong: '¡Todos fallaron!',
     mixed: 'Hubo de todo',
   };
 
-  // ═══════════ COUNTDOWN ═══════════
+  const isTruth = revealData.truth;
+  const resultColor = isTruth ? 'text-water-deep' : 'text-tequila-deep';
+  const resultBgGradient = isTruth
+    ? 'from-water-light/30 via-water/15 to-transparent'
+    : 'from-tequila-light/40 via-tequila/20 to-transparent';
+
   if (!showResult) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
-        <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">La respuesta es...</p>
-        <div className="text-8xl font-black text-gold animate-countdown" key={countdown}>
+        <p className="text-ink-soft text-[11px] uppercase tracking-[0.2em] font-semibold mb-8">
+          La respuesta es…
+        </p>
+        <div
+          className="text-9xl font-black text-ink animate-countdown"
+          key={countdown}
+          style={{ textShadow: '0 8px 32px rgba(15,20,25,0.15)' }}
+        >
           {countdown}
         </div>
       </div>
     );
   }
 
-  // ═══════════ FULL REVEAL ═══════════
   return (
-    <div className="min-h-[100dvh] flex flex-col px-6 py-8 overflow-y-auto">
-      {/* Auto-advance bar */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gray-800">
+    <div className="min-h-[100dvh] flex flex-col px-6 py-8 overflow-y-auto max-w-md mx-auto w-full">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-ink-hint/30">
         <div
-          className="h-full bg-gold transition-all duration-1000 ease-linear"
+          className="h-full bg-gradient-to-r from-water-light via-water to-water-deep transition-all duration-1000 ease-linear"
           style={{ width: `${(autoTimer / 10) * 100}%` }}
         />
       </div>
 
-      {/* Truth/Lie result */}
       <div className="text-center mb-6 animate-fade-in">
-        <div className="text-6xl mb-3">
-          {revealData.truth ? '✅' : '❌'}
-        </div>
-        <p className="text-3xl font-black text-white mb-1">
-          {revealData.truth ? 'VERDAD' : 'MENTIRA'}
+        <p className={`text-[11px] uppercase tracking-[0.2em] font-bold mb-2 ${resultColor}`}>
+          {isTruth ? 'Agua' : 'Tequila'}
         </p>
-        <div className="glass-card mt-3">
+        <p className={`text-5xl font-black mb-4 ${resultColor}`}
+           style={{ textShadow: '0 4px 24px rgba(15,20,25,0.12)' }}>
+          {isTruth ? 'VERDAD' : 'MENTIRA'}
+        </p>
+        <div className={`lg-card-sm p-4 bg-gradient-to-br ${resultBgGradient}`}>
           {revealData.type === 'interpersonal' && (
-            <span className="text-xs text-gold/60 uppercase tracking-wider mb-1 block">Interpersonal</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-water font-bold mb-1.5 block">
+              Interpersonal
+            </span>
           )}
-          <p className="text-gray-300 text-sm italic">
-            "{revealData.affirmation}"
+          <p className="text-ink text-sm italic font-medium">
+            “{revealData.affirmation}”
           </p>
         </div>
       </div>
 
-      {/* Who guessed what */}
       {showDrinkers && (
         <div className="animate-slide-up mb-4">
-          {/* Reason */}
-          <p className="text-center text-gray-400 text-sm mb-3">
+          <p className="text-center text-ink-soft text-sm mb-3 font-semibold">
             {reasonText[revealData.reason]}
           </p>
 
-          {/* Guesses list */}
-          <div className="glass-card mb-4">
-            <p className="text-gray-400 text-xs uppercase tracking-wider mb-3">Votos</p>
-            <div className="space-y-2">
+          <div className="lg-card mb-4">
+            <p className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-3">
+              Votos
+            </p>
+            <div className="space-y-1.5">
               {revealData.guesses.map((g: any) => (
                 <div key={g.playerName} className="flex items-center justify-between py-1.5">
-                  <span className="text-white text-sm">{g.playerName}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">
-                      {g.guess === 'verdad' ? '✅ Verdad' : '❌ Mentira'}
+                  <span className="text-ink text-sm font-semibold">{g.playerName}</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className={`text-[11px] uppercase tracking-wider font-bold ${
+                      g.guess === 'verdad' ? 'text-water-deep' : 'text-tequila-deep'
+                    }`}>
+                      {g.guess === 'verdad' ? 'Agua' : 'Tequila'}
                     </span>
-                    <span className={`text-lg ${g.correct ? '' : ''}`}>
-                      {g.correct ? '🎯' : '💀'}
-                    </span>
+                    <span className={`w-2 h-2 rounded-full ${
+                      g.correct ? 'bg-water shadow-[0_0_8px_rgba(45,111,163,0.6)]' : 'bg-ink-hint'
+                    }`} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* DRINKERS - the money shot */}
-          <div className={`rounded-2xl p-5 text-center ${
+          <div className={`rounded-3xl p-6 text-center backdrop-blur-xl border ${
             revealData.drinkers.length > 0
-              ? 'bg-gradient-to-b from-amber-900/40 to-amber-950/40 border border-gold/20'
-              : 'glass-card'
+              ? 'bg-gradient-to-br from-tequila-light/40 via-tequila/25 to-tequila-deep/15 border-tequila/30 shadow-[0_20px_60px_rgba(198,135,41,0.25)]'
+              : 'bg-white/60 border-white/80 shadow-[0_8px_32px_rgba(15,20,25,0.06)]'
           }`}>
-            <p className="text-4xl mb-2 shot-animation">🥃</p>
+            <img
+              src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+              alt=""
+              className="w-16 mx-auto mb-3 shot-animation"
+            />
             {revealData.drinkers.length > 0 ? (
               <>
-                <p className="text-gold font-black text-lg mb-1">¡TOMAN SHOT!</p>
-                <p className="text-white text-xl font-bold">
+                <p className="text-tequila-deep font-black text-base uppercase tracking-[0.15em] mb-2">
+                  ¡Toman shot!
+                </p>
+                <p className="text-ink text-xl font-black">
                   {revealData.drinkers.join(', ')}
                 </p>
               </>
             ) : (
-              <p className="text-gray-400 text-sm">Nadie toma esta ronda</p>
+              <p className="text-ink-soft text-sm font-semibold">Nadie toma esta ronda</p>
             )}
           </div>
         </div>
       )}
 
-      {/* Scoreboard */}
       {showScoreboard && scoreboard.length > 0 && (
-        <div className="animate-slide-up glass-card mb-20">
-          <p className="text-gray-400 text-xs uppercase tracking-wider mb-3">Marcador</p>
-          <div className="space-y-2">
+        <div className="animate-slide-up lg-card mb-24">
+          <p className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-3">
+            Marcador
+          </p>
+          <div className="space-y-1.5">
             {scoreboard.map((s: any, i: number) => (
               <div key={s.playerName} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-xs w-4">{i + 1}.</span>
-                  <span className="text-white text-sm font-medium">{s.playerName}</span>
+                  <span className="text-ink-faint text-xs w-4 font-bold">{i + 1}.</span>
+                  <span className="text-ink text-sm font-semibold">{s.playerName}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-xs">🎯 {s.correctGuesses}</span>
-                  <span className="text-gold font-bold text-sm">🥃 {s.shotsTaken}</span>
+                  <span className="text-water-deep text-xs font-bold">
+                    {s.correctGuesses} aciertos
+                  </span>
+                  <span className="text-tequila-deep font-black text-sm">
+                    {s.shotsTaken} shots
+                  </span>
                 </div>
               </div>
             ))}
@@ -165,18 +185,19 @@ export default function RevealView({ game }: { game: any }) {
         </div>
       )}
 
-      {/* Manual advance (host) / auto timer */}
       {showScoreboard && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-gray-900 via-gray-900">
-          {isHost ? (
-            <button onClick={game.nextTurn} className="btn-gold w-full text-lg">
-              Siguiente turno →
-            </button>
-          ) : (
-            <p className="text-gray-500 text-sm text-center">
-              Siguiente turno en {autoTimer}s...
-            </p>
-          )}
+        <div className="fixed bottom-0 left-0 right-0 p-6 backdrop-blur-xl bg-gradient-to-t from-paper via-paper/95 to-transparent">
+          <div className="max-w-md mx-auto">
+            {isHost ? (
+              <button onClick={game.nextTurn} className="btn-water text-base">
+                Siguiente turno
+              </button>
+            ) : (
+              <p className="text-ink-soft text-sm text-center font-medium">
+                Siguiente turno en {autoTimer}s…
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
