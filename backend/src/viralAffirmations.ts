@@ -9,11 +9,18 @@
  */
 
 import type { RelationType } from './types';
+import scenePromptsData from './scenePrompts.json';
 
 export interface ViralAffirmation {
   text: string;
   level: 'suave' | 'picante' | 'extrema' | 'all';
 }
+
+// ═══════════ SCENE PROMPTS (para generación de imágenes) ═══════════
+// Auto-generados con Sonnet 4.5 a partir de cada afirmación.
+// Ver /aot-image-test/batch_generate_scene_prompts.py para regenerarlos.
+type ScenePromptEntry = { text: string; level: string; scenePrompt: string | null };
+const SCENE_PROMPTS = scenePromptsData as Record<string, ScenePromptEntry[]>;
 
 /**
  * Config visible al usuario para cada tipo de relación.
@@ -41,9 +48,9 @@ export const RELATION_CONFIG: Record<RelationType, {
   amigos_generico:    { label: 'Amigos (grupo)',          group: 'Amistad', ready: true },
   rivalidad:          { label: 'Rivalidad',               group: 'Amistad', ready: true },
   // Hermanos
-  hermanos_hh:        { label: 'Hermanos (H-H)',          group: 'Familia', ready: false },
-  hermanos_mm:        { label: 'Hermanas (M-M)',          group: 'Familia', ready: false },
-  hermanos_hm:        { label: 'Hermano y hermana',       group: 'Familia', ready: false },
+  hermanos_hh:        { label: 'Hermanos (H-H)',          group: 'Familia', ready: true },
+  hermanos_mm:        { label: 'Hermanas (M-M)',          group: 'Familia', ready: true },
+  hermanos_hm:        { label: 'Hermano y hermana',       group: 'Familia', ready: true },
   // Padres/hijos
   madre_hija:         { label: 'Madre e hija',            group: 'Familia', roles: ['madre','hija'],     ready: false },
   madre_hijo:         { label: 'Madre e hijo',            group: 'Familia', roles: ['madre','hijo'],     ready: false },
@@ -277,3 +284,65 @@ export function getPoolFor(relationType: RelationType, level: 'suave' | 'picante
 export function fillTemplate(text: string, yoName: string, otroName: string): string {
   return text.replace(/\{yo\}/g, yoName).replace(/\{otro\}/g, otroName);
 }
+
+// ═══════════ SCENE PROMPTS HELPER (para generación de imágenes con Gemini) ═══════════
+
+export interface PlayerIdentity {
+  name: string;
+  gender: 'hombre' | 'mujer' | 'otro';
+  role?: string;
+}
+
+function describeSubject(p: PlayerIdentity, position: 1 | 2): string {
+  const posWord = position === 1 ? 'FIRST' : 'SECOND';
+  const genderWord = p.gender === 'hombre' ? 'man' : p.gender === 'mujer' ? 'woman' : 'person';
+  const pronoun = p.gender === 'hombre' ? 'his' : p.gender === 'mujer' ? 'her' : 'their';
+  const roleHint = p.role ? ` (role in this scene: ${p.role})` : '';
+  return `The ${posWord} attached image is the reference photo of ${p.name} (${genderWord})${roleHint}. Preserve ${pronoun} exact likeness with FORENSIC accuracy: face geometry (jawline, nose bridge, eye spacing, brow position, lip shape), hair color and texture, skin tone, age, ethnicity. Keep real imperfections (pores, asymmetries, hair flyaways). Do NOT smooth, polish, or idealize.`;
+}
+
+/**
+ * Devuelve un prompt cinematográfico hiperrealista listo para Gemini 3 Pro Image,
+ * adaptado con la identidad real de los jugadores y la cláusula anti-distortion.
+ *
+ * - Inyecta un IDENTITY LOCK al principio (antes del prompt base), porque el batch
+ *   auto-generado a veces describe la escena antes de la identidad, lo que pierde fidelidad.
+ * - Reemplaza [SUBJECT_A]/[SUBJECT_B] del prompt base con los nombres reales.
+ * - Añade explícitamente que la expresión NO debe deformar la geometría facial
+ *   (esto resuelve casos de horror/extreme expression que generaban caras genéricas).
+ *
+ * Devuelve null si la afirmación no tiene scenePrompt curado en este pool.
+ */
+export function getScenePromptFor(
+  relationType: RelationType,
+  affirmationText: string,
+  playerA: PlayerIdentity,
+  playerB?: PlayerIdentity,
+): string | null {
+  const pool = SCENE_PROMPTS[relationType];
+  if (!pool) return null;
+
+  const entry = pool.find(e => e.text === affirmationText);
+  if (!entry || !entry.scenePrompt) return null;
+
+  const subjectA = describeSubject(playerA, 1);
+  const subjectB = playerB ? describeSubject(playerB, 2) : '';
+
+  const identityLock = `IDENTITY LOCK — READ THIS BEFORE THE SCENE BELOW:
+
+${subjectA}${subjectB ? '\n\n' + subjectB : ''}
+
+CRITICAL RULE — IDENTITY OVERRIDES EXPRESSION:
+Even if the scene below describes extreme emotions (horror, shock, ecstasy, anger, drunkenness, etc.), body language, or specific facial expressions, you MUST NOT deform the face geometry to match generic stock-photo templates. Do NOT widen eyes to cartoonish proportions, do NOT stretch mouths past natural limits, do NOT raise eyebrows so high they leave their natural arch, do NOT slim or fatten faces to fit emotional archetypes. Preserve the real face proportions, eye spacing, brow position, jawline, cheek volume, and skin texture from the reference photo(s) exactly. Expression intensity must NEVER override identity preservation. The viewer must INSTANTLY recognize ${playerA.name}${playerB ? ' and ' + playerB.name : ''} as the people in the reference photos.
+
+──────────────── SCENE ────────────────
+
+`;
+
+  let basePrompt = entry.scenePrompt
+    .replace(/\[SUBJECT_A\]/g, playerA.name)
+    .replace(/\[SUBJECT_B\]/g, playerB?.name || '[SUBJECT_B]');
+
+  return identityLock + basePrompt;
+}
+
