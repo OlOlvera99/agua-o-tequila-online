@@ -53,12 +53,12 @@ export const RELATION_CONFIG: Record<RelationType, {
   hermanos_hm:        { label: 'Hermano y hermana',       group: 'Familia', ready: true },
   // Padres/hijos
   madre_hija:         { label: 'Madre e hija',            group: 'Familia', roles: ['madre','hija'],     ready: false },
-  madre_hijo:         { label: 'Madre e hijo',            group: 'Familia', roles: ['madre','hijo'],     ready: false },
+  madre_hijo:         { label: 'Madre e hijo',            group: 'Familia', roles: ['madre','hijo'],     ready: true },
   padre_hijo:         { label: 'Padre e hijo',            group: 'Familia', roles: ['padre','hijo'],     ready: false },
-  padre_hija:         { label: 'Padre e hija',            group: 'Familia', roles: ['padre','hija'],     ready: false },
+  padre_hija:         { label: 'Padre e hija',            group: 'Familia', roles: ['padre','hija'],     ready: true },
   // Familia política
-  suegra_nuera:       { label: 'Suegra y nuera',          group: 'Familia', roles: ['suegra','nuera'],   ready: false },
-  suegro_yerno:       { label: 'Suegro y yerno',          group: 'Familia', roles: ['suegro','yerno'],   ready: false },
+  suegra_nuera:       { label: 'Suegra y nuera',          group: 'Familia', roles: ['suegra','nuera'],   ready: true },
+  suegro_yerno:       { label: 'Suegro y yerno',          group: 'Familia', roles: ['suegro','yerno'],   ready: true },
   // Roomies
   roomies_hh:         { label: 'Roomies (H-H)',           group: 'Convivencia', ready: false },
   roomies_mm:         { label: 'Roomies (M-M)',           group: 'Convivencia', ready: false },
@@ -115,6 +115,9 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
     { text: '{yo} ha perdido amistades por culpa de {otro}', level: 'picante' },
     { text: '{yo} es más probable a ser infiel que {otro}', level: 'extrema' },
     { text: 'Si {otro} le pidiera matrimonio hoy a {yo}, diría que sí', level: 'picante' },
+    // — Extras de cuestionario AoT (Drive) —
+    { text: '{otro} es tacaña según {yo}', level: 'picante' },
+    { text: 'A {yo} le gustaría tener una familia con {otro}', level: 'suave' },
   ],
   ex_pareja: [
     { text: '{yo} todavía stalkea a {otro} en redes', level: 'picante' },
@@ -151,6 +154,17 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
     { text: 'Si nadie se entera, {yo} le daría un beso a {otro}', level: 'extrema' },
     { text: 'Si {yo} tuviera que matar a su perro para salvar a {otro}, lo haría', level: 'picante' },
     { text: '{yo} es más probable a ser estéril que {otro}', level: 'extrema' },
+    // — Extras de "Cuestionario AoT MEJORES AMIGOS" (Drive, ago 2025) —
+    { text: '{yo} es más probable a enamorarse en un table que {otro}', level: 'extrema' },
+    { text: '{yo} es más probable a terminar en la cárcel que {otro}', level: 'picante' },
+    { text: '{yo} tiene más aguante que {otro}', level: 'picante' },
+    { text: '{yo} es más probable a decepcionar a sus papás que {otro}', level: 'picante' },
+    { text: '{yo} es más probable a perdonar cuernos que {otro}', level: 'extrema' },
+    { text: 'Si {yo} y {otro} estuvieran en una isla desierta, {yo} cogería con {otro}', level: 'extrema' },
+    { text: 'Si {yo} y {otro} fueran políticos, {yo} sería más corrupto que {otro}', level: 'picante' },
+    { text: '{yo} es más probable a engañar a su esposa que {otro}', level: 'extrema' },
+    { text: '{yo} es más precoz que {otro}', level: 'extrema' },
+    { text: '{yo} es el más gay de los dos', level: 'extrema' },
   ],
   mejores_amigas_mm: [
     { text: '{otro} tiene más probabilidades de divorciarse que {yo}', level: 'picante' },
@@ -218,6 +232,21 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
     { text: '{yo} es el favorito de mamá', level: 'picante' },
     { text: '{yo} le ha robado algo a {otro} sin que se dé cuenta', level: 'picante' },
     { text: '{yo} se ha sentido en la sombra de {otro}', level: 'suave' },
+    // — Extras de "Sesión de Desarrollo HAC Noviembre 2024" + cuestionarios Álvarez/Cantú —
+    { text: 'Si {otro} no fuera hermano de {yo}, serían amigos', level: 'suave' },
+    { text: '{yo} desearía ser hijo único', level: 'picante' },
+    { text: 'A {yo} le ha caído mal alguna novia de {otro}', level: 'picante' },
+    { text: '{yo} va a ser más exitoso que {otro} profesionalmente', level: 'picante' },
+    { text: 'Los hijos de {yo} van a estar más pendejos que los de {otro}', level: 'extrema' },
+    { text: '{yo} es más probable a ser gay que {otro}', level: 'extrema' },
+    { text: '{yo} va a cuidar más de sus papás que {otro} cuando estén viejitos', level: 'suave' },
+    { text: '{yo} se ha sentido avergonzado alguna vez de {otro}', level: 'picante' },
+    { text: 'Si {yo} y {otro} se agarran a golpes, {yo} ganaría', level: 'all' },
+    { text: '{yo} ha cachado a {otro} viendo porno', level: 'picante' },
+    { text: '{yo} es el hijo más pendejo', level: 'extrema' },
+    { text: '{yo} se va a morir primero que {otro}', level: 'picante' },
+    { text: '{yo} es mejor hermano que {otro}', level: 'suave' },
+    { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
   ],
   hermanos_mm: [
     { text: '{yo} cree que sus papás quieren más a {otro}', level: 'picante' },
@@ -226,6 +255,21 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
     { text: '{yo} es la favorita de mamá', level: 'picante' },
     { text: '{yo} le ha robado algo a {otro} sin que se dé cuenta', level: 'picante' },
     { text: '{yo} se ha sentido en la sombra de {otro}', level: 'suave' },
+    // — Extras de "Sesión de Desarrollo HAC Noviembre 2024" + cuestionarios Bárbara/Sofía/Violeta/Mariana —
+    { text: 'Si {otro} no fuera hermana de {yo}, serían amigas', level: 'suave' },
+    { text: '{yo} desearía ser hija única', level: 'picante' },
+    { text: 'A {yo} le ha caído mal alguna vez un novio de {otro}', level: 'picante' },
+    { text: '{yo} va a ser más exitosa que {otro} profesionalmente', level: 'picante' },
+    { text: 'Los hijos de {yo} van a estar más pendejos que los de {otro}', level: 'extrema' },
+    { text: '{yo} es más probable a ser lesbiana que {otro}', level: 'extrema' },
+    { text: '{yo} va a cuidar más de sus papás que {otro} cuando estén viejitos', level: 'suave' },
+    { text: '{yo} se ha sentido avergonzada alguna vez de {otro}', level: 'picante' },
+    { text: '{yo} se viste mejor que {otro}', level: 'suave' },
+    { text: '{yo} ha llorado por razones más tontas que {otro}', level: 'picante' },
+    { text: '{yo} es la hija más pendeja', level: 'extrema' },
+    { text: '{yo} se va a morir primero que {otro}', level: 'picante' },
+    { text: '{yo} es mejor hermana que {otro}', level: 'suave' },
+    { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
   ],
   hermanos_hm: [
     { text: '{yo} cree que sus papás quieren más a {otro}', level: 'picante' },
@@ -237,16 +281,91 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
   ],
 
   // ═══════════ PADRES / HIJOS ═══════════
-  // TODO: Ricardo tiene padre-hija y madre-hijo curadas. Pegar aquí.
   madre_hija: [],
-  madre_hijo: [],
+  // Pool de "Hablemos al Chile 8 de junio" — hijo + mamá hablan
+  madre_hijo: [
+    // — Hijo habla —
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'A {yo} le ha atraído alguna de las amigas de {otro}', level: 'extrema' },
+    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema' },
+    { text: '{yo} le ha robado dinero a {otro}', level: 'picante' },
+    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema' },
+    { text: 'Si {yo} tiene un problema, iría primero con su papá que con {otro}', level: 'picante' },
+    { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
+    // — Mamá habla —
+    { text: '{otro} es el hijo favorito de {yo}', level: 'picante' },
+    { text: '{yo} recuerda la noche en que {otro} fue concebido', level: 'extrema' },
+    { text: 'Hay algo del papá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante' },
+    { text: '{yo} extraña a la ex novia de {otro}', level: 'picante' },
+    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante' },
+    { text: '{otro} fue planeado', level: 'picante' },
+    { text: '{yo} está orgullosa de {otro}', level: 'suave' },
+  ],
   padre_hijo: [],
-  padre_hija: [],
+  // Pool de "Cuestionario HAC Papá e Hija" — hija + padre hablan
+  padre_hija: [
+    // — Hija habla —
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'A {yo} le ha atraído alguno de los amigos de {otro}', level: 'extrema' },
+    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema' },
+    { text: '{yo} le ha robado dinero a {otro}', level: 'picante' },
+    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema' },
+    { text: 'Si {yo} tiene un problema, iría primero con su mamá que con {otro}', level: 'picante' },
+    { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
+    // — Padre habla —
+    { text: '{otro} es la hija favorita de {yo}', level: 'picante' },
+    { text: '{yo} recuerda la noche en que {otro} fue concebida', level: 'extrema' },
+    { text: 'Hay algo de la mamá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante' },
+    { text: '{yo} extraña al ex novio de {otro}', level: 'picante' },
+    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante' },
+    { text: '{otro} fue planeada', level: 'picante' },
+    { text: '{yo} está orgulloso de {otro}', level: 'suave' },
+  ],
 
   // ═══════════ FAMILIA POLÍTICA ═══════════
-  // TODO: Ricardo tiene suegro-yerno curada. Suegra-nuera se está curando ahora.
-  suegra_nuera: [],
-  suegro_yerno: [],
+  // Pool de "AoT Julio 2025" + "Cuestionario AoT SUEGRA - NUERA"
+  suegra_nuera: [
+    // — Suegra habla —
+    { text: '{yo} cree que las parejas deberían vivir juntas antes de casarse', level: 'suave' },
+    { text: 'Alguna vez {yo} se ha puesto celosa de {otro}', level: 'picante' },
+    { text: '{yo} es más guapa que {otro}', level: 'all' },
+    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante' },
+    { text: 'El hijo de {yo} anda con {otro} porque se parece a {yo}', level: 'picante' },
+    { text: '{yo} cree que el hombre siempre debería ser proveedor', level: 'picante' },
+    { text: '{yo} tiene mejor sazón que {otro}', level: 'picante' },
+    { text: 'Si el hijo de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema' },
+    // — Nuera habla —
+    { text: 'Si {yo} se embaraza hoy, abortaría', level: 'extrema' },
+    { text: 'Si {yo} hubiera conocido al esposo de {otro} a la edad de su hijo, serían novios', level: 'extrema' },
+    { text: '{yo} le pondría a su hija el nombre de {otro}', level: 'suave' },
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'Si {yo} y {otro} fueran de la misma edad, serían amigas', level: 'suave' },
+    { text: '{yo} ha probado más drogas que {otro}', level: 'picante' },
+    { text: 'Si el novio de {yo} pudiera salvar la vida de una de las dos, salvaría a {yo}', level: 'picante' },
+    { text: '{yo} renunciaría a sus sueños por ser mamá de tiempo completo', level: 'picante' },
+  ],
+  // Pool de "AoT Julio 2025" + "Cuestionario AoT SUEGRO - YERNO"
+  suegro_yerno: [
+    // — Suegro habla —
+    { text: '{yo} es más borracho que {otro}', level: 'picante' },
+    { text: '{yo} es más probable a ser gay que {otro}', level: 'extrema' },
+    { text: '{yo} es más guapo que {otro}', level: 'all' },
+    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante' },
+    { text: 'La hija de {yo} anda con {otro} porque se parece a {yo}', level: 'picante' },
+    { text: '{yo} cree que el hombre siempre debería ser proveedor', level: 'picante' },
+    { text: 'Si {yo} y {otro} se agarran a golpes, {yo} ganaría', level: 'all' },
+    { text: 'Si hoy {otro} le pide a {yo} la mano de su hija, {yo} aceptaría', level: 'picante' },
+    { text: 'Si la hija de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema' },
+    // — Yerno habla —
+    { text: 'Si {yo} hubiera conocido a la esposa de {otro} a la edad de su hija, serían novios', level: 'extrema' },
+    { text: '{yo} le pondría a su hijo el nombre de {otro}', level: 'suave' },
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'Si {yo} y {otro} fueran de la misma edad, serían amigos', level: 'suave' },
+    { text: '{yo} ha probado más drogas que {otro}', level: 'picante' },
+    { text: 'Si la hija de {otro} tuviera un accidente, le hablaría primero a {yo}', level: 'picante' },
+    { text: '{yo} es más inteligente que {otro}', level: 'all' },
+    { text: '{yo} le va a dar mejor vida a la hija de {otro} que la que {otro} le dio', level: 'suave' },
+  ],
 
   // ═══════════ ROOMIES ═══════════
   // TODO: pendiente curar.
