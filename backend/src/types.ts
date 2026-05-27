@@ -11,75 +11,62 @@ export interface Player {
   questionnaireReady: boolean;
 }
 
-// ═══════════ CUESTIONARIO ═══════════
+// ═══════════ CUESTIONARIO (SIMPLIFICADO) ═══════════
 
 export interface PlayerProfile {
   gender: 'hombre' | 'mujer' | 'otro';
-  orientation: 'heterosexual' | 'homosexual' | 'bisexual' | 'prefiero no decir';
-  tags: string[];           // fiestero, tímido, coqueto, intenso, etc.
-  bio: string;              // texto libre sobre sí mismo
-  relationships: PairRelationship[];
+  role?: string;            // rol opcional para relaciones jerárquicas: 'madre', 'jefe', 'suegra', etc.
 }
 
-export interface PairRelationship {
-  targetName: string;
-  type: RelationType;
-  comment: string;          // opcional: "terminó mal", "hay tensión"
-}
+// ═══════════ RELATION TYPES ═══════════
+// Una sola decisión del host al crear la sala determina de qué pool sacar afirmaciones.
 
 export type RelationType =
-  | 'amigos'
-  | 'mejores_amigos'
-  | 'novios'
+  // Parejas románticas
+  | 'novios_hetero'
+  | 'novios_gay'
+  | 'novias_lesbianas'
   | 'ex_pareja'
-  | 'hermanos'
-  | 'familia'
+  // Amigos
+  | 'mejores_amigos_hh'
+  | 'mejores_amigas_mm'
+  | 'amigos_hm'
+  | 'amigos_generico'
   | 'se_gustan'
   | 'rivalidad'
-  | 'compañeros_trabajo';
-
-export interface HostSecrets {
-  [playerName: string]: string;  // chisme privado por jugador
-}
-
-export const PLAYER_TAGS = [
-  'fiestero', 'tímido', 'coqueto', 'intenso', 'bromista',
-  'serio', 'dramático', 'competitivo', 'relajado', 'misterioso',
-  'romántico', 'sarcástico', 'aventurero', 'reservado', 'payaso',
-] as const;
-
-// ═══════════ IA ADAPTATIVA ═══════════
-
-export type AffirmationType = 'general' | 'interpersonal';
-
-export interface GeneratedAffirmation {
-  text: string;
-  type: AffirmationType;
-  targetPlayer: string;         // sobre quién es la afirmación
-  involvedPlayer?: string;      // otro jugador involucrado (si es interpersonal)
-  priority?: number;            // mayor = usar primero (personalizadas > genéricas)
-}
-
-export interface RoundHistory {
-  round: number;
-  playerName: string;
-  affirmation: string;
-  type: AffirmationType;
-  truth: boolean;               // qué respondió el jugador
-  guesses: { playerName: string; guess: string; correct: boolean }[];
-  groupAccuracy: number;        // % del grupo que acertó
-  blindSpotDetected: boolean;   // si el grupo falló mayoritariamente
-}
+  // Hermanos
+  | 'hermanos_hh'
+  | 'hermanos_mm'
+  | 'hermanos_hm'
+  // Padres/hijos
+  | 'madre_hija'
+  | 'madre_hijo'
+  | 'padre_hijo'
+  | 'padre_hija'
+  // Familia política
+  | 'suegra_nuera'
+  | 'suegro_yerno'
+  // Roomies
+  | 'roomies_hh'
+  | 'roomies_mm'
+  | 'roomies_hm'
+  // Laboral / formación
+  | 'jefe_empleado'
+  | 'profesor_exalumno'
+  | 'companeros_trabajo';
 
 // ═══════════ GAME CONFIG ═══════════
 
 export interface GameSettings {
   level: 'suave' | 'picante' | 'extrema';
-  context: string;
+  relationType: RelationType;
   timerSeconds: number;
 }
 
 export type GamePhase = 'lobby' | 'questionnaire' | 'confirming' | 'guessing' | 'reveal';
+
+// Compat: el cliente actual usa este tipo para etiquetar afirmaciones. Conservamos 'general'.
+export type AffirmationType = 'general' | 'interpersonal';
 
 export interface GuessResult {
   playerName: string;
@@ -106,7 +93,6 @@ export interface ClientEvents {
   JOIN_ROOM: (data: { roomId: string; playerName: string }, cb: (res: { success?: boolean; error?: string }) => void) => void;
   UPDATE_SETTINGS: (data: { roomId: string; settings: Partial<GameSettings> }) => void;
   SUBMIT_PROFILE: (data: { roomId: string; profile: PlayerProfile }) => void;
-  SUBMIT_HOST_SECRETS: (data: { roomId: string; secrets: HostSecrets }) => void;
   START_GAME: (data: { roomId: string }) => void;
   CONFIRM_TRUTH: (data: { roomId: string; isTrue: boolean }) => void;
   SUBMIT_GUESS: (data: { roomId: string; guess: 'verdad' | 'mentira' }) => void;
@@ -120,7 +106,6 @@ export interface ServerEvents {
   ROOM_UPDATE: (state: any) => void;
   QUESTIONNAIRE_START: (data: { players: string[] }) => void;
   QUESTIONNAIRE_PROGRESS: (data: { ready: number; total: number }) => void;
-  GENERATING_AFFIRMATIONS: () => void;
   NEW_TURN: (data: { currentPlayer: string; affirmation: string; round: number; currentPlayerId: string; phase: GamePhase; type: AffirmationType }) => void;
   PLAYER_CONFIRMED: () => void;
   GUESS_COUNT: (data: { voted: number; total: number }) => void;

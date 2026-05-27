@@ -10,6 +10,56 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 export type GamePhase = 'landing' | 'lobby' | 'questionnaire' | 'confirming' | 'guessing' | 'reveal';
 export type AffirmationType = 'general' | 'interpersonal';
 
+export type RelationType =
+  | 'novios_hetero' | 'novios_gay' | 'novias_lesbianas' | 'ex_pareja' | 'se_gustan'
+  | 'mejores_amigos_hh' | 'mejores_amigas_mm' | 'amigos_hm' | 'amigos_generico' | 'rivalidad'
+  | 'hermanos_hh' | 'hermanos_mm' | 'hermanos_hm'
+  | 'madre_hija' | 'madre_hijo' | 'padre_hijo' | 'padre_hija'
+  | 'suegra_nuera' | 'suegro_yerno'
+  | 'roomies_hh' | 'roomies_mm' | 'roomies_hm'
+  | 'jefe_empleado' | 'profesor_exalumno' | 'companeros_trabajo';
+
+export interface RelationOption {
+  key: RelationType;
+  label: string;
+  group: string;
+  roles?: [string, string];
+  ready: boolean;
+}
+
+// Mirror del RELATION_CONFIG del backend (mantener sincronizado)
+export const RELATION_OPTIONS: RelationOption[] = [
+  { key: 'novios_hetero',      label: 'Pareja (hombre y mujer)', group: 'Parejas',      ready: true },
+  { key: 'novios_gay',         label: 'Pareja (dos hombres)',    group: 'Parejas',      ready: true },
+  { key: 'novias_lesbianas',   label: 'Pareja (dos mujeres)',    group: 'Parejas',      ready: true },
+  { key: 'ex_pareja',          label: 'Ex-pareja',               group: 'Parejas',      ready: true },
+  { key: 'se_gustan',          label: 'Se gustan / hay tensión', group: 'Parejas',      ready: true },
+  { key: 'mejores_amigos_hh',  label: 'Mejores amigos (H-H)',    group: 'Amistad',      ready: true },
+  { key: 'mejores_amigas_mm',  label: 'Mejores amigas (M-M)',    group: 'Amistad',      ready: true },
+  { key: 'amigos_hm',          label: 'Amigo y amiga (H-M)',     group: 'Amistad',      ready: true },
+  { key: 'amigos_generico',    label: 'Amigos (grupo)',          group: 'Amistad',      ready: true },
+  { key: 'rivalidad',          label: 'Rivalidad',               group: 'Amistad',      ready: true },
+  { key: 'hermanos_hh',        label: 'Hermanos (H-H)',          group: 'Familia',      ready: false },
+  { key: 'hermanos_mm',        label: 'Hermanas (M-M)',          group: 'Familia',      ready: false },
+  { key: 'hermanos_hm',        label: 'Hermano y hermana',       group: 'Familia',      ready: false },
+  { key: 'madre_hija',         label: 'Madre e hija',            group: 'Familia',      roles: ['madre','hija'],   ready: false },
+  { key: 'madre_hijo',         label: 'Madre e hijo',            group: 'Familia',      roles: ['madre','hijo'],   ready: false },
+  { key: 'padre_hijo',         label: 'Padre e hijo',            group: 'Familia',      roles: ['padre','hijo'],   ready: false },
+  { key: 'padre_hija',         label: 'Padre e hija',            group: 'Familia',      roles: ['padre','hija'],   ready: false },
+  { key: 'suegra_nuera',       label: 'Suegra y nuera',          group: 'Familia',      roles: ['suegra','nuera'], ready: false },
+  { key: 'suegro_yerno',       label: 'Suegro y yerno',          group: 'Familia',      roles: ['suegro','yerno'], ready: false },
+  { key: 'roomies_hh',         label: 'Roomies (H-H)',           group: 'Convivencia',  ready: false },
+  { key: 'roomies_mm',         label: 'Roomies (M-M)',           group: 'Convivencia',  ready: false },
+  { key: 'roomies_hm',         label: 'Roomies (H-M)',           group: 'Convivencia',  ready: false },
+  { key: 'jefe_empleado',      label: 'Jefe y empleado',         group: 'Trabajo',      roles: ['jefe','empleado'],     ready: false },
+  { key: 'profesor_exalumno',  label: 'Profesor y ex-alumno',    group: 'Trabajo',      roles: ['profesor','ex-alumno'], ready: false },
+  { key: 'companeros_trabajo', label: 'Compañeros de trabajo',   group: 'Trabajo',      ready: true },
+];
+
+export const RELATION_BY_KEY: Record<RelationType, RelationOption> = Object.fromEntries(
+  RELATION_OPTIONS.map(o => [o.key, o])
+) as Record<RelationType, RelationOption>;
+
 export interface PlayerInfo {
   name: string;
   socketId: string;
@@ -21,11 +71,10 @@ export interface RoomState {
   id: string;
   hostId: string;
   players: PlayerInfo[];
-  settings: { level: string; context: string; timerSeconds: number };
+  settings: { level: 'suave'|'picante'|'extrema'; relationType: RelationType; timerSeconds: number };
   phase: string;
   playerCount: number;
   questionnaireProgress: { ready: number; total: number };
-  aiAvailable: boolean;
 }
 
 export interface TurnData {
@@ -60,10 +109,7 @@ export interface ScoreEntry {
 
 export interface PlayerProfile {
   gender: 'hombre' | 'mujer' | 'otro';
-  orientation: 'heterosexual' | 'homosexual' | 'bisexual' | 'prefiero no decir';
-  tags: string[];
-  bio: string;
-  relationships: { targetName: string; type: string; comment: string }[];
+  role?: string;
 }
 
 // ═══════════ HOOK ═══════════
@@ -75,7 +121,6 @@ export function useGameSocket() {
   const [myName, setMyName] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('');
 
-  // Game state
   const [phase, setPhase] = useState<GamePhase>('landing');
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [turnData, setTurnData] = useState<TurnData | null>(null);
@@ -87,7 +132,6 @@ export function useGameSocket() {
   const [hasSubmittedGuess, setHasSubmittedGuess] = useState(false);
   const [hasConfirmed, setHasConfirmed] = useState(false);
 
-  // Derived
   const isHost = roomState?.hostId === mySocketId;
   const isMyTurn = turnData?.currentPlayerId === mySocketId;
 
@@ -103,30 +147,17 @@ export function useGameSocket() {
       setConnected(true);
       setMySocketId(socket.id || '');
     });
-
     socket.on('disconnect', () => setConnected(false));
 
-    // Lobby
     socket.on('ROOM_UPDATE', (state: RoomState) => {
       setRoomState(state);
       if (state.phase === 'lobby' && phase === 'landing') setPhase('lobby');
       if (state.phase === 'questionnaire') setPhase('questionnaire');
     });
 
-    // Cuestionario
-    socket.on('QUESTIONNAIRE_START', () => {
-      setPhase('questionnaire');
-    });
+    socket.on('QUESTIONNAIRE_START', () => setPhase('questionnaire'));
+    socket.on('QUESTIONNAIRE_PROGRESS', (data) => setQuestionnaireProgress(data));
 
-    socket.on('QUESTIONNAIRE_PROGRESS', (data) => {
-      setQuestionnaireProgress(data);
-    });
-
-    socket.on('GENERATING_AFFIRMATIONS', () => {
-      setIsGenerating(true);
-    });
-
-    // Turno
     socket.on('NEW_TURN', (data: TurnData) => {
       setTurnData(data);
       setRevealData(null);
@@ -134,33 +165,19 @@ export function useGameSocket() {
       setIsGenerating(false);
       setHasSubmittedGuess(false);
       setHasConfirmed(false);
-
-      if (data.phase === 'confirming') {
-        setPhase('confirming');
-      } else if (data.phase === 'guessing') {
-        setPhase('guessing');
-      }
+      if (data.phase === 'confirming') setPhase('confirming');
+      else if (data.phase === 'guessing') setPhase('guessing');
     });
 
-    // Jugador confirmó → pasar a votación
-    socket.on('PLAYER_CONFIRMED', () => {
-      setPhase('guessing');
-    });
+    socket.on('PLAYER_CONFIRMED', () => setPhase('guessing'));
+    socket.on('GUESS_COUNT', (data) => setGuessCount(data));
 
-    // Conteo de votos
-    socket.on('GUESS_COUNT', (data) => {
-      setGuessCount(data);
-    });
-
-    // Revelación
     socket.on('REVEAL', (data: RevealData) => {
       setRevealData(data);
       setPhase('reveal');
     });
 
-    socket.on('SCOREBOARD', (data) => {
-      setScoreboard(data.scores);
-    });
+    socket.on('SCOREBOARD', (data) => setScoreboard(data.scores));
 
     socketRef.current = socket;
     return () => { socket.disconnect(); };
@@ -176,9 +193,7 @@ export function useGameSocket() {
           setRoomId(res.roomId);
           setPhase('lobby');
           resolve(res.roomId);
-        } else {
-          reject(res.error);
-        }
+        } else reject(res.error);
       });
     });
   }, []);
@@ -191,9 +206,7 @@ export function useGameSocket() {
           setRoomId(targetRoomId.toUpperCase());
           setPhase('lobby');
           resolve();
-        } else {
-          reject(res.error);
-        }
+        } else reject(res.error);
       });
     });
   }, []);
@@ -204,10 +217,6 @@ export function useGameSocket() {
 
   const submitProfile = useCallback((profile: PlayerProfile) => {
     socketRef.current?.emit('SUBMIT_PROFILE', { roomId, profile });
-  }, [roomId]);
-
-  const submitHostSecrets = useCallback((secrets: Record<string, string>) => {
-    socketRef.current?.emit('SUBMIT_HOST_SECRETS', { roomId, secrets });
   }, [roomId]);
 
   const startGame = useCallback(() => {
@@ -233,19 +242,13 @@ export function useGameSocket() {
   }, [roomId]);
 
   return {
-    // Connection
     connected, mySocketId, myName, roomId,
-    // State
     phase, roomState, turnData, guessCount,
     revealData, scoreboard, isGenerating,
-    questionnaireProgress,
-    hasSubmittedGuess, hasConfirmed,
-    // Derived
+    questionnaireProgress, hasSubmittedGuess, hasConfirmed,
     isHost, isMyTurn,
-    // Actions
     createRoom, joinRoom, updateSettings,
-    submitProfile, submitHostSecrets,
-    startGame, confirmTruth, submitGuess,
+    submitProfile, startGame, confirmTruth, submitGuess,
     nextTurn, regenerate,
   };
 }

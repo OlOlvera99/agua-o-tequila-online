@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { RELATION_OPTIONS, RelationType } from '@/hooks/useGameSocket';
 
 export default function LandingView({ game }: { game: any }) {
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [level, setLevel] = useState<'suave' | 'picante' | 'extrema'>('picante');
+  const [relationType, setRelationType] = useState<RelationType>('amigos_generico');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +28,7 @@ export default function LandingView({ game }: { game: any }) {
     setLoading(true);
     setError('');
     try {
-      await game.createRoom(name.trim(), { level });
+      await game.createRoom(name.trim(), { level, relationType });
     } catch (e: any) {
       setError(e || 'Error al crear sala');
     }
@@ -73,6 +75,12 @@ export default function LandingView({ game }: { game: any }) {
       </div>
     );
   }
+
+  // Agrupar relation options por categoría para el dropdown
+  const grouped = RELATION_OPTIONS.reduce((acc, opt) => {
+    (acc[opt.group] ||= []).push(opt);
+    return acc;
+  }, {} as Record<string, typeof RELATION_OPTIONS>);
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-8 relative">
@@ -124,22 +132,45 @@ export default function LandingView({ game }: { game: any }) {
         )}
 
         {mode === 'create' && (
-          <div>
-            <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
-              Nivel
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['suave', 'picante', 'extrema'] as const).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLevel(l)}
-                  className={`seg ${level === l ? 'seg-active' : ''}`}
-                >
-                  {l.charAt(0).toUpperCase() + l.slice(1)}
-                </button>
-              ))}
+          <>
+            <div>
+              <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
+                Tipo de relación
+              </label>
+              <select
+                value={relationType}
+                onChange={e => setRelationType(e.target.value as RelationType)}
+                className="lg-input"
+              >
+                {Object.entries(grouped).map(([group, opts]) => (
+                  <optgroup key={group} label={group}>
+                    {opts.map(o => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}{!o.ready ? ' (beta — pool limitado)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
-          </div>
+
+            <div>
+              <label className="text-ink-soft text-[11px] uppercase tracking-[0.15em] font-semibold mb-1.5 block">
+                Nivel
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['suave', 'picante', 'extrema'] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLevel(l)}
+                    className={`seg ${level === l ? 'seg-active' : ''}`}
+                  >
+                    {l.charAt(0).toUpperCase() + l.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {error && (

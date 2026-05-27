@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { RELATION_BY_KEY, RELATION_OPTIONS, RelationType } from '@/hooks/useGameSocket';
 
 export default function LobbyView({ game }: { game: any }) {
   const [copied, setCopied] = useState(false);
+  const [editingRelation, setEditingRelation] = useState(false);
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}?room=${game.roomId}`
@@ -64,10 +66,53 @@ export default function LobbyView({ game }: { game: any }) {
       </button>
 
       {settings && (
-        <div className="lg-card-sm px-5 py-3.5 mb-3 flex items-center justify-between">
-          <span className="text-ink-soft text-sm font-medium">Nivel</span>
-          <span className="font-bold text-ink">{levelLabel}</span>
-        </div>
+        <>
+          <div className="lg-card-sm px-5 py-3.5 mb-3 flex items-center justify-between">
+            <span className="text-ink-soft text-sm font-medium">Nivel</span>
+            <span className="font-bold text-ink">{levelLabel}</span>
+          </div>
+
+          <div className="lg-card-sm px-5 py-3.5 mb-3">
+            <div className="flex items-center justify-between">
+              <span className="text-ink-soft text-sm font-medium">Tipo de relación</span>
+              {game.isHost ? (
+                <button
+                  onClick={() => setEditingRelation(v => !v)}
+                  className="text-water text-xs font-bold uppercase tracking-wider"
+                >
+                  {editingRelation ? 'Cerrar' : 'Cambiar'}
+                </button>
+              ) : null}
+            </div>
+            {!editingRelation && (
+              <span className="font-bold text-ink block mt-1">
+                {RELATION_BY_KEY[settings.relationType as RelationType]?.label || settings.relationType}
+              </span>
+            )}
+            {editingRelation && game.isHost && (
+              <select
+                value={settings.relationType}
+                onChange={e => game.updateSettings({ relationType: e.target.value as RelationType })}
+                className="lg-input mt-2 text-sm"
+              >
+                {Object.entries(
+                  RELATION_OPTIONS.reduce((acc, o) => {
+                    (acc[o.group] ||= []).push(o);
+                    return acc;
+                  }, {} as Record<string, typeof RELATION_OPTIONS>)
+                ).map(([group, opts]) => (
+                  <optgroup key={group} label={group}>
+                    {opts.map(o => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}{!o.ready ? ' (beta)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
+          </div>
+        </>
       )}
 
       <div className="lg-card mb-6">

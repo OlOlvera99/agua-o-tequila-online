@@ -1,16 +1,12 @@
 import { customAlphabet } from 'nanoid';
 import { AFFIRMATIONS } from './affirmations';
-import { ClaudeService } from './ClaudeService';
-import { generatePersonalizedAffirmations } from './PersonalizedEngine';
+import { getPoolFor, fillTemplate, RELATION_CONFIG, ViralAffirmation } from './viralAffirmations';
 import type {
   Player, GameSettings, GamePhase, RoundResults, ScoreEntry,
-  PlayerProfile, HostSecrets, GeneratedAffirmation, RoundHistory, AffirmationType
+  PlayerProfile, AffirmationType, RelationType,
 } from './types';
 
-// IDs legibles tipo "RJZD96KUL9"
 const generateId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 10);
-
-const claude = new ClaudeService();
 
 export class GameRoom {
   id: string;
@@ -20,23 +16,17 @@ export class GameRoom {
   settings: GameSettings;
   lastActivity: number = Date.now();
 
-  // Estado del turno
+  // Turno
   round: number = 0;
   currentPlayerIndex: number = -1;
   currentAffirmation: string = '';
   currentAffirmationType: AffirmationType = 'general';
   currentTruth: boolean | null = null;
 
-  // Pool de afirmaciones (orden de prioridad: personalized > ai > fallback)
-  personalizedPool: GeneratedAffirmation[] = [];
-  aiPool: GeneratedAffirmation[] = [];
-  affirmationPool: string[] = [];
-  usedAffirmations: Set<string> = new Set();
-
-  // Cuestionario + IA
-  hostSecrets: HostSecrets = {};
-  private roundHistory: RoundHistory[] = [];
-  private isGenerating: boolean = false;
+  // Pool de afirmaciones (solo viral + fallback genérico)
+  private viralPool: ViralAffirmation[] = [];
+  private usedTemplates: Set<string> = new Set();
+  private fallbackPool: string[] = [];
 
   // Timer
   private guessTimerId: NodeJS.Timeout | null = null;
@@ -49,7 +39,7 @@ export class GameRoom {
     this.hostId = hostId;
     this.settings = {
       level: settings.level || 'picante',
-      context: settings.context || '',
+      relationType: settings.relationType || 'amigos_generico',
       timerSeconds: 30,
     };
     this.addPlayer(hostId, hostName, true);
@@ -73,7 +63,6 @@ export class GameRoom {
 
   removePlayer(socketId: string) {
     this.players = this.players.filter(p => p.socketId !== socketId);
-    // Transferir host si se fue
     if (this.hostId === socketId && this.players.length > 0) {
       this.hostId = this.players[0].socketId;
       this.players[0].isHost = true;
@@ -83,7 +72,7 @@ export class GameRoom {
 
   updateSettings(settings: Partial<GameSettings>) {
     if (settings.level) this.settings.level = settings.level;
-    if (settings.context !== undefined) this.settings.context = settings.context;
+    if (settings.relationType) this.settings.relationType = settings.relationType;
     this.touch();
   }
 
@@ -98,11 +87,6 @@ export class GameRoom {
     this.touch();
   }
 
-  setHostSecrets(secrets: HostSecrets) {
-    this.hostSecrets = secrets;
-    this.touch();
-  }
-
   getQuestionnaireProgress(): { ready: number; total: number } {
     const ready = this.players.filter(p => p.questionnaireReady).length;
     return { ready, total: this.players.length };
@@ -112,166 +96,65 @@ export class GameRoom {
     return this.players.every(p => p.questionnaireReady);
   }
 
-  // ═══════════ AFIRMACIONES ═══════════
+  // ═══════════ POOL DE AFIRMACIONES ═══════════
 
-  /** Genera pool local como fallback base */
-  generateFallbackPool() {
-    const pool = [...AFFIRMATIONS[this.settings.level]];
+  /** Inicializa el pool al empezar el juego. Sin IA, sin regex. */
+  initPool() {
+    this.viralPool = getPoolFor(this.settings.relationType, this.settings.level);
+    this.fallbackPool = [...(AFFIRMATIONS[this.settings.level] || [])];
+    this.shuffleArray(this.viralPool);
+    this.shuffleArray(this.fallbackPool);
+    this.usedTemplates.clear();
+    console.log(`📋 Pool inicial para ${this.settings.relationType} (${this.settings.level}): ${this.viralPool.length} virales + ${this.fallbackPool.length} fallback`);
+  }
+
+  private pickOtroFor(currentPlayer: Player): Player {
+    // Si la relación tiene roles, intentar elegir un player con rol distinto
+    const config = RELATION_CONFIG[this.settings.relationType];
+    const others = this.players.filter(p => p.socketId !== currentPlayer.socketId);
+
+    if (config?.roles && currentPlayer.profile?.role) {
+      const counterRole = config.roles.find(r => r !== currentPlayer.profile?.role);
+      const match = others.find(p => p.profile?.role === counterRole);
+      if (match) return match;
+    }
+
+    return others[Math.floor(Math.random() * others.length)];
+  }
+
+  private pickAffirmation(): void {
+    const currentPlayer = this.players[this.currentPlayerIndex];
+    const otro = this.pickOtroFor(currentPlayer);
+
+    // Buscar primero en pool viral
+    const availableViral = this.viralPool.filter(a => !this.usedTemplates.has(a.text));
+
+    if (availableViral.length > 0) {
+      const chosen = availableViral[Math.floor(Math.random() * availableViral.length)];
+      this.usedTemplates.add(chosen.text);
+      this.currentAffirmation = fillTemplate(chosen.text, currentPlayer.name, otro?.name || 'alguien');
+      this.currentAffirmationType = chosen.text.includes('{otro}') ? 'interpersonal' : 'general';
+      console.log(`🎯 Viral: "${this.currentAffirmation}"`);
+      return;
+    }
+
+    // Fallback al pool genérico
+    const availableFallback = this.fallbackPool.filter(t => !this.usedTemplates.has(t));
+    if (availableFallback.length === 0) {
+      // Se acabó todo → reciclar
+      this.usedTemplates.clear();
+      this.shuffleArray(this.viralPool);
+      this.shuffleArray(this.fallbackPool);
+      return this.pickAffirmation();
+    }
+
+    const template = availableFallback[Math.floor(Math.random() * availableFallback.length)];
+    this.usedTemplates.add(template);
     const playerNames = this.players.map(p => p.name);
-
-    this.affirmationPool = pool.map(aff => {
-      return aff.replace(/\{nombre\}/g, () => {
-        const randomName = playerNames[Math.floor(Math.random() * playerNames.length)];
-        return randomName;
-      });
-    });
-    this.shuffleArray(this.affirmationPool);
-
-    // ═══════════ GENERAR PERSONALIZADAS (regex + virales) ═══════════
-    this.personalizedPool = generatePersonalizedAffirmations(
-      this.players,
-      this.hostSecrets,
-      this.settings.level,
-    );
-
-    console.log(`📋 Pool personalizado: ${this.personalizedPool.length} afirmaciones`);
-    console.log(`📋 Pool fallback (genérico): ${this.affirmationPool.length} afirmaciones`);
-  }
-
-  /** 
-   * Genera catalizadores inteligentes con Claude IA.
-   * Estos tienen MÁXIMA prioridad (110) y se basan en el texto libre del cuestionario.
-   * Se agregan al personalizedPool al inicio.
-   */
-  async generateAICatalysts(): Promise<boolean> {
-    if (!claude.isAvailable()) {
-      console.log('⚠️ Claude API no disponible, usando solo regex + fallback');
-      return false;
-    }
-
-    const playersWithProfiles = this.players
-      .filter(p => p.profile)
-      .map(p => ({ name: p.name, profile: p.profile! }));
-
-    if (playersWithProfiles.length === 0) return false;
-
-    try {
-      const catalysts = await claude.generateCatalystBatch(
-        playersWithProfiles,
-        this.hostSecrets,
-        this.settings.level,
-      );
-
-      if (catalysts.length > 0) {
-        // Insertar al INICIO del pool personalizado (máxima prioridad)
-        this.personalizedPool = [...catalysts, ...this.personalizedPool];
-        // Re-ordenar por prioridad
-        this.personalizedPool.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-        console.log(`🤖 Pool final: ${this.personalizedPool.length} personalizadas (${catalysts.length} IA + ${this.personalizedPool.length - catalysts.length} regex)`);
-        return true;
-      }
-    } catch (err) {
-      console.error('Error generando catalizadores IA:', err);
-    }
-    return false;
-  }
-
-  /** Genera afirmaciones con IA (adaptativas) */
-  async generateAIBatch(): Promise<boolean> {
-    if (!claude.isAvailable() || this.isGenerating) return false;
-
-    const playersWithProfiles = this.players
-      .filter(p => p.profile)
-      .map(p => ({ name: p.name, profile: p.profile! }));
-
-    if (playersWithProfiles.length === 0) return false;
-
-    this.isGenerating = true;
-
-    try {
-      const currentPlayer = this.players[
-        (this.currentPlayerIndex + 1) % this.players.length // next player
-      ];
-
-      const batch = await claude.generateBatch({
-        players: playersWithProfiles,
-        hostSecrets: this.hostSecrets,
-        settings: this.settings,
-        history: this.roundHistory,
-        currentPlayerName: currentPlayer.name,
-      }, 8);
-
-      if (batch.length > 0) {
-        this.aiPool.push(...batch);
-        this.isGenerating = false;
-        return true;
-      }
-    } catch (err) {
-      console.error('Error generating AI batch:', err);
-    }
-
-    this.isGenerating = false;
-    return false;
-  }
-
-  private pickAffirmation() {
-    const currentPlayerName = this.getCurrentPlayerName();
-
-    // ═══════════ PRIORIDAD 1: PERSONALIZADAS (del cuestionario/chisme) ═══════════
-    const personalizedIndex = this.personalizedPool.findIndex(a =>
-      a.targetPlayer === currentPlayerName && !this.usedAffirmations.has(a.text)
-    );
-
-    if (personalizedIndex !== -1) {
-      const aff = this.personalizedPool.splice(personalizedIndex, 1)[0];
-      this.currentAffirmation = aff.text;
-      this.currentAffirmationType = aff.type;
-      this.usedAffirmations.add(aff.text);
-      console.log(`🎯 Afirmación PERSONALIZADA (prioridad ${aff.priority}): "${aff.text}"`);
-      return;
-    }
-
-    // ═══════════ PRIORIDAD 2: IA GENERADA ═══════════
-    const aiIndex = this.aiPool.findIndex(a =>
-      a.targetPlayer === currentPlayerName && !this.usedAffirmations.has(a.text)
-    );
-
-    if (aiIndex !== -1) {
-      const aiAff = this.aiPool.splice(aiIndex, 1)[0];
-      this.currentAffirmation = aiAff.text;
-      this.currentAffirmationType = aiAff.type;
-      this.usedAffirmations.add(aiAff.text);
-      console.log(`🧠 Afirmación IA: "${aiAff.text}"`);
-      return;
-    }
-
-    // ═══════════ PRIORIDAD 3: PERSONALIZADAS DE OTROS (si no hay para este jugador) ═══════════
-    const anyPersonalized = this.personalizedPool.findIndex(a =>
-      !this.usedAffirmations.has(a.text)
-    );
-
-    if (anyPersonalized !== -1) {
-      const aff = this.personalizedPool.splice(anyPersonalized, 1)[0];
-      this.currentAffirmation = aff.text;
-      this.currentAffirmationType = aff.type;
-      this.usedAffirmations.add(aff.text);
-      console.log(`🎯 Afirmación PERSONALIZADA (otro jugador): "${aff.text}"`);
-      return;
-    }
-
-    // ═══════════ PRIORIDAD 4: FALLBACK GENÉRICO ═══════════
-    const available = this.affirmationPool.filter(a => !this.usedAffirmations.has(a));
-
-    if (available.length === 0) {
-      this.usedAffirmations.clear();
-      this.shuffleArray(this.affirmationPool);
-      this.currentAffirmation = this.affirmationPool[0];
-    } else {
-      this.currentAffirmation = available[Math.floor(Math.random() * available.length)];
-    }
+    const text = template.replace(/\{nombre\}/g, () => playerNames[Math.floor(Math.random() * playerNames.length)]);
+    this.currentAffirmation = text;
     this.currentAffirmationType = 'general';
-    this.usedAffirmations.add(this.currentAffirmation);
-    console.log(`📦 Afirmación GENÉRICA: "${this.currentAffirmation}"`);
+    console.log(`📦 Fallback: "${this.currentAffirmation}"`);
   }
 
   regenerateAffirmation() {
@@ -286,9 +169,8 @@ export class GameRoom {
     this.round++;
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
     this.currentTruth = null;
-    this.phase = 'confirming'; // Jugador en turno ve la afirmación primero
+    this.phase = 'confirming';
 
-    // Reset votos de todos
     this.players.forEach(p => { p.currentGuess = null; });
 
     this.pickAffirmation();
@@ -315,7 +197,6 @@ export class GameRoom {
   startGuessTimer() {
     this.clearTimers();
     this.guessTimerId = setTimeout(() => {
-      // Timer expiró → los que no votaron cuentan como fallo
       this.forceGuessTimeout();
       if (this.onTimerExpired) this.onTimerExpired();
     }, this.settings.timerSeconds * 1000);
@@ -335,15 +216,12 @@ export class GameRoom {
     return { voted, total: voters.length };
   }
 
-  /** Timer expiró: los que no votaron se marcan como fallo automático */
   private forceGuessTimeout() {
     const truthAnswer = this.currentTruth ? 'verdad' : 'mentira';
-    // A los que no votaron les asignamos la respuesta INCORRECTA
     const wrongAnswer = truthAnswer === 'verdad' ? 'mentira' : 'verdad';
-
     this.players.forEach(p => {
       if (p.socketId !== this.getCurrentPlayerId() && p.currentGuess === null) {
-        p.currentGuess = wrongAnswer; // forzar respuesta incorrecta
+        p.currentGuess = wrongAnswer;
       }
     });
   }
@@ -355,8 +233,6 @@ export class GameRoom {
     const voters = this.players.filter(p => p.socketId !== this.getCurrentPlayerId());
     const currentPlayer = this.players[this.currentPlayerIndex];
 
-    // Fallback: si por algún edge case el jugador no votó, asignar la respuesta INCORRECTA.
-    // (Normalmente forceGuessTimeout ya seteó currentGuess antes de llegar aquí.)
     const wrongAnswer: 'verdad' | 'mentira' = truthAnswer === 'verdad' ? 'mentira' : 'verdad';
 
     const guesses = voters.map(p => ({
@@ -372,17 +248,14 @@ export class GameRoom {
     let reason: 'all_correct' | 'all_wrong' | 'mixed';
 
     if (allCorrect) {
-      // Todos acertaron → jugador del turno toma
       drinkers = [currentPlayer.name];
       currentPlayer.shotsTaken++;
       reason = 'all_correct';
     } else if (allWrong) {
-      // Todos fallaron → jugador del turno toma
       drinkers = [currentPlayer.name];
       currentPlayer.shotsTaken++;
       reason = 'all_wrong';
     } else {
-      // Mix → los que fallaron toman
       reason = 'mixed';
       voters.forEach(p => {
         if (p.currentGuess !== truthAnswer) {
@@ -392,36 +265,14 @@ export class GameRoom {
       });
     }
 
-    // Actualizar aciertos
     voters.forEach(p => {
-      if (p.currentGuess === truthAnswer) {
-        p.correctGuesses++;
-      }
+      if (p.currentGuess === truthAnswer) p.correctGuesses++;
     });
-
-    // ═══════════ HISTORIAL PARA IA ADAPTATIVA ═══════════
-    const groupAccuracy = guesses.filter(g => g.correct).length / guesses.length;
-    this.roundHistory.push({
-      round: this.round,
-      playerName: currentPlayer.name,
-      affirmation: this.currentAffirmation,
-      type: this.currentAffirmationType,
-      truth: this.currentTruth!,
-      guesses,
-      groupAccuracy,
-      blindSpotDetected: groupAccuracy < 0.4, // menos del 40% acertó = punto ciego
-    });
-
-    // Después de cada ronda, pre-generar siguiente lote de IA en background
-    if (claude.isAvailable() && this.aiPool.length < 4) {
-      this.generateAIBatch().catch(() => {}); // fire and forget
-    }
 
     this.touch();
     return { guesses, drinkers, reason };
   }
 
-  /** Inicia timer de 10s para auto-avanzar después de revelación */
   startRevealTimer() {
     this.clearTimers();
     this.revealTimerId = setTimeout(() => {
@@ -455,24 +306,19 @@ export class GameRoom {
       phase: this.phase,
       playerCount: this.players.length,
       questionnaireProgress: this.getQuestionnaireProgress(),
-      aiAvailable: claude.isAvailable(),
     };
   }
 
   // ═══════════ UTILS ═══════════
 
-  private touch() {
-    this.lastActivity = Date.now();
-  }
+  private touch() { this.lastActivity = Date.now(); }
 
   private clearTimers() {
     if (this.guessTimerId) { clearTimeout(this.guessTimerId); this.guessTimerId = null; }
     if (this.revealTimerId) { clearTimeout(this.revealTimerId); this.revealTimerId = null; }
   }
 
-  destroy() {
-    this.clearTimers();
-  }
+  destroy() { this.clearTimers(); }
 
   private shuffleArray(arr: any[]) {
     for (let i = arr.length - 1; i > 0; i--) {
