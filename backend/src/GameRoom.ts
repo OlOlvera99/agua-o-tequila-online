@@ -22,10 +22,12 @@ export class GameRoom {
   round: number = 0;
   currentPlayerIndex: number = -1;
   currentAffirmation: string = '';
+  currentAffirmationTemplate: string = ''; // texto con {yo}/{otro} sin rellenar (para image-gen)
   currentAffirmationType: AffirmationType = 'general';
   currentTruth: boolean | null = null;
   currentRelationType: RelationType = 'amigos_generico';
   currentOtherPlayerName: string = '';
+  currentImageBase64: string = '';
 
   // Pool tracking
   private usedTemplates: Set<string> = new Set();
@@ -153,10 +155,12 @@ export class GameRoom {
     if (available.length > 0) {
       const chosen = available[Math.floor(Math.random() * available.length)];
       this.usedTemplates.add(chosen.text);
+      this.currentAffirmationTemplate = chosen.text;
       this.currentAffirmation = fillTemplate(chosen.text, currentPlayer.name, otro.name);
       this.currentAffirmationType = chosen.text.includes('{otro}') ? 'interpersonal' : 'general';
       this.currentRelationType = relationType;
       this.currentOtherPlayerName = otro.name;
+      this.currentImageBase64 = ''; // reset; image arrives async
       console.log(`🎯 [${relationType}] (${currentPlayer.name} → ${otro.name}): "${this.currentAffirmation}"`);
       return;
     }
@@ -185,9 +189,11 @@ export class GameRoom {
     const playerNames = this.players.map(p => p.name);
     const text = template.replace(/\{nombre\}/g, () => playerNames[Math.floor(Math.random() * playerNames.length)]);
     this.currentAffirmation = text;
+    this.currentAffirmationTemplate = template;
     this.currentAffirmationType = 'general';
     this.currentRelationType = 'amigos_generico';
     this.currentOtherPlayerName = otro?.name || '';
+    this.currentImageBase64 = '';
     console.log(`📦 Fallback: "${this.currentAffirmation}"`);
   }
 

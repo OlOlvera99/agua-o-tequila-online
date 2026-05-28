@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { RoomManager } from './RoomManager';
 import { GROUP_VIBE_CONFIG, RELATION_KIND_LABELS } from './viralAffirmations';
+import { generateTurnImage, isImageGenAvailable } from './imageService';
 import type { ClientEvents, ServerEvents, GroupVibe, RelationKind } from './types';
 
 const app = express();
@@ -249,6 +250,45 @@ io.on('connection', (socket) => {
       phase: room.phase,
       type: room.currentAffirmationType,
     });
+    triggerImageGen(room, roomId);
+  }
+
+  function triggerImageGen(room: any, roomId: string) {
+    if (!isImageGenAvailable() || !room.currentAffirmationTemplate) return;
+    const turnRound = room.round;
+    const yoPlayer = room.getCurrentPlayer();
+    const otroPlayer = room.getOtherPlayer();
+    if (!yoPlayer?.profile?.selfieBase64) return; // no selfie → skip
+
+    const yoArg = {
+      name: yoPlayer.name,
+      gender: yoPlayer.profile.gender,
+      selfieBase64: yoPlayer.profile.selfieBase64,
+      role: yoPlayer.profile.role,
+    };
+    const otroArg = otroPlayer?.profile
+      ? {
+          name: otroPlayer.name,
+          gender: otroPlayer.profile.gender,
+          selfieBase64: otroPlayer.profile.selfieBase64,
+          role: otroPlayer.profile.role,
+        }
+      : undefined;
+
+    generateTurnImage(
+      room.currentRelationType,
+      room.currentAffirmationTemplate,
+      yoArg,
+      otroArg,
+    ).then((imageBase64: string | null) => {
+      if (!imageBase64) return;
+      // Si ya cambiamos de turno, no emitimos
+      if (room.round !== turnRound) return;
+      room.currentImageBase64 = imageBase64;
+      io.to(roomId).emit('IMAGE_READY', { round: turnRound, imageBase64 });
+    }).catch((err: any) => {
+      console.error('Image gen failed for turn', turnRound, err?.message || err);
+    });
   }
 
   function doReveal(room: any, roomId: string) {
@@ -261,6 +301,7 @@ io.on('connection', (socket) => {
       drinkers: results.drinkers,
       reason: results.reason,
       type: room.currentAffirmationType,
+      imageBase64: room.currentImageBase64 || undefined,
     });
     io.to(roomId).emit('SCOREBOARD', { scores: room.getScoreboard() });
     room.onAutoAdvance = () => startTurn(room, roomId);
@@ -285,6 +326,7 @@ io.on('connection', (socket) => {
       phase: room.phase,
       type: room.currentAffirmationType,
     });
+    triggerImageGen(room, roomId);
   });
 
   socket.on('disconnect', () => {

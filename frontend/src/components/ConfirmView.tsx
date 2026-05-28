@@ -37,6 +37,16 @@ export default function ConfirmView({ game }: { game: any }) {
           Es tu turno
         </p>
 
+        {turnData.imageBase64 && (
+          <div className="w-full max-w-sm mb-4 rounded-2xl overflow-hidden shadow-lg border border-white/60">
+            <img
+              src={`data:image/png;base64,${turnData.imageBase64}`}
+              alt="Escena"
+              className="w-full aspect-square object-cover"
+            />
+          </div>
+        )}
+
         <div className="lg-hero w-full max-w-sm mb-8 animate-fade-in">
           {turnData.type === 'interpersonal' && (
             <span className="text-[10px] uppercase tracking-[0.18em] text-water font-bold mb-2 block">

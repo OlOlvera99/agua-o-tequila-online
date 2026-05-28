@@ -92,6 +92,17 @@ export default function RevealView({ game }: { game: any }) {
            style={{ textShadow: '0 4px 24px rgba(15,20,25,0.12)' }}>
           {isTruth ? 'VERDAD' : 'MENTIRA'}
         </p>
+
+        {revealData.imageBase64 && (
+          <div className="w-full mb-4 rounded-2xl overflow-hidden shadow-xl border border-white/60">
+            <img
+              src={`data:image/png;base64,${revealData.imageBase64}`}
+              alt="Escena"
+              className="w-full aspect-square object-cover"
+            />
+          </div>
+        )}
+
         <div className={`lg-card-sm p-4 bg-gradient-to-br ${resultBgGradient}`}>
           {revealData.type === 'interpersonal' && (
             <span className="text-[10px] uppercase tracking-[0.18em] text-water font-bold mb-1.5 block">
