@@ -10,8 +10,9 @@ const SELFIE_QUALITY = 0.85;
 
 export default function QuestionnaireView({ game }: { game: any }) {
   const players = game.roomState?.players || [];
+  // Filtra por socketId Y por nombre (defensive contra races de mySocketId vacío)
   const otherPlayers: { name: string; socketId: string }[] = players.filter(
-    (p: any) => p.socketId !== game.mySocketId
+    (p: any) => p.socketId !== game.mySocketId && p.name !== game.myName
   );
   const settings = game.roomState?.settings;
   const groupVibe: GroupVibe = settings?.groupVibe || 'amigos_mixto';
@@ -214,10 +215,19 @@ export default function QuestionnaireView({ game }: { game: any }) {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 backdrop-blur-xl bg-gradient-to-t from-paper via-paper/95 to-transparent">
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto space-y-2">
           <button onClick={handleSubmit} className="btn-water text-base">
             Enviar
           </button>
+          {game.isHost && progress && (
+            <button
+              onClick={game.startGame}
+              className="btn-ghost text-sm"
+              title="Empieza el juego sin esperar (los que no llenaron no podrán recibir afirmaciones personalizadas)"
+            >
+              Empezar ya ({progress.ready}/{progress.total} listos)
+            </button>
+          )}
         </div>
       </div>
     </div>
