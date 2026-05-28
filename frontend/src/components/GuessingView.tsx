@@ -107,12 +107,10 @@ export default function GuessingView({ game }: { game: any }) {
 
       <p className="text-ink-soft text-sm mb-3 font-medium">¿Verdad o mentira?</p>
       <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-        <button onClick={() => game.submitGuess('verdad')} className="vote-truth">
-          <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Agua</span>
+        <button onClick={() => game.submitGuess('verdad')} className="vote-yes">
           <span>Verdad</span>
         </button>
-        <button onClick={() => game.submitGuess('mentira')} className="vote-lie">
-          <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Tequila</span>
+        <button onClick={() => game.submitGuess('mentira')} className="vote-no">
           <span>Mentira</span>
         </button>
       </div>
