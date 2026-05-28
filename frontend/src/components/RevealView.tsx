@@ -8,7 +8,6 @@ export default function RevealView({ game }: { game: any }) {
   const [showDrinkers, setShowDrinkers] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [autoTimer, setAutoTimer] = useState(10);
 
   useEffect(() => {
     setShowResult(false);
@@ -31,18 +30,6 @@ export default function RevealView({ game }: { game: any }) {
 
     return () => clearInterval(cd);
   }, [revealData]);
-
-  useEffect(() => {
-    if (!showScoreboard) return;
-    setAutoTimer(10);
-    const timer = setInterval(() => {
-      setAutoTimer(prev => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [showScoreboard]);
 
   if (!revealData || !turnData) return null;
 
@@ -77,13 +64,6 @@ export default function RevealView({ game }: { game: any }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col px-6 py-8 overflow-y-auto max-w-md mx-auto w-full">
-      <div className="absolute top-0 left-0 right-0 h-1 bg-ink-hint/30">
-        <div
-          className="h-full bg-gradient-to-r from-water-light via-water to-water-deep transition-all duration-1000 ease-linear"
-          style={{ width: `${(autoTimer / 10) * 100}%` }}
-        />
-      </div>
-
       <div className="text-center mb-6 animate-fade-in">
         <p className={`text-[11px] uppercase tracking-[0.2em] font-bold mb-2 ${resultColor}`}>
           {isTruth ? 'Agua' : 'Tequila'}
@@ -205,7 +185,7 @@ export default function RevealView({ game }: { game: any }) {
               </button>
             ) : (
               <p className="text-ink-soft text-sm text-center font-medium">
-                Siguiente turno en {autoTimer}s…
+                Esperando al host para siguiente turno…
               </p>
             )}
           </div>

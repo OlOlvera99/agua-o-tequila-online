@@ -223,9 +223,7 @@ io.on('connection', (socket) => {
       phase: room.phase,
       type: room.currentAffirmationType,
     });
-
-    room.onTimerExpired = () => doReveal(room, roomId);
-    room.startGuessTimer();
+    // SIN auto-timer — termina solo cuando todos votan (o el host fuerza reveal)
   });
 
   socket.on('SUBMIT_GUESS', ({ roomId, guess }) => {
@@ -304,8 +302,7 @@ io.on('connection', (socket) => {
       imageBase64: room.currentImageBase64 || undefined,
     });
     io.to(roomId).emit('SCOREBOARD', { scores: room.getScoreboard() });
-    room.onAutoAdvance = () => startTurn(room, roomId);
-    room.startRevealTimer();
+    // SIN auto-advance — solo el host avanza con NEXT_TURN
   }
 
   socket.on('NEXT_TURN', ({ roomId }) => {
