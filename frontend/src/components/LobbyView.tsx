@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { RELATION_BY_KEY, RELATION_OPTIONS, RelationType } from '@/hooks/useGameSocket';
+import { GROUP_VIBE_OPTIONS, GroupVibe } from '@/hooks/useGameSocket';
 
 export default function LobbyView({ game }: { game: any }) {
   const [copied, setCopied] = useState(false);
-  const [editingRelation, setEditingRelation] = useState(false);
+  const [editingVibe, setEditingVibe] = useState(false);
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}?room=${game.roomId}`
@@ -38,6 +38,8 @@ export default function LobbyView({ game }: { game: any }) {
     : settings?.level === 'picante' ? 'Picante'
     : settings?.level === 'extrema' ? 'Extrema'
     : '';
+
+  const vibeLabel = GROUP_VIBE_OPTIONS.find(g => g.key === settings?.groupVibe)?.label || '';
 
   return (
     <div className="min-h-[100dvh] flex flex-col px-6 py-8 max-w-md mx-auto w-full">
@@ -74,40 +76,27 @@ export default function LobbyView({ game }: { game: any }) {
 
           <div className="lg-card-sm px-5 py-3.5 mb-3">
             <div className="flex items-center justify-between">
-              <span className="text-ink-soft text-sm font-medium">Tipo de relación</span>
+              <span className="text-ink-soft text-sm font-medium">Tipo de grupo</span>
               {game.isHost ? (
                 <button
-                  onClick={() => setEditingRelation(v => !v)}
+                  onClick={() => setEditingVibe(v => !v)}
                   className="text-water text-xs font-bold uppercase tracking-wider"
                 >
-                  {editingRelation ? 'Cerrar' : 'Cambiar'}
+                  {editingVibe ? 'Cerrar' : 'Cambiar'}
                 </button>
               ) : null}
             </div>
-            {!editingRelation && (
-              <span className="font-bold text-ink block mt-1">
-                {RELATION_BY_KEY[settings.relationType as RelationType]?.label || settings.relationType}
-              </span>
+            {!editingVibe && (
+              <span className="font-bold text-ink block mt-1">{vibeLabel}</span>
             )}
-            {editingRelation && game.isHost && (
+            {editingVibe && game.isHost && (
               <select
-                value={settings.relationType}
-                onChange={e => game.updateSettings({ relationType: e.target.value as RelationType })}
+                value={settings.groupVibe}
+                onChange={e => game.updateSettings({ groupVibe: e.target.value as GroupVibe })}
                 className="lg-input mt-2 text-sm"
               >
-                {Object.entries(
-                  RELATION_OPTIONS.reduce((acc, o) => {
-                    (acc[o.group] ||= []).push(o);
-                    return acc;
-                  }, {} as Record<string, typeof RELATION_OPTIONS>)
-                ).map(([group, opts]) => (
-                  <optgroup key={group} label={group}>
-                    {opts.map(o => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}{!o.ready ? ' (beta)' : ''}
-                      </option>
-                    ))}
-                  </optgroup>
+                {GROUP_VIBE_OPTIONS.map(o => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
                 ))}
               </select>
             )}

@@ -3,8 +3,8 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { RoomManager } from './RoomManager';
-import { RELATION_CONFIG } from './viralAffirmations';
-import type { ClientEvents, ServerEvents, RelationType } from './types';
+import { GROUP_VIBE_CONFIG, RELATION_KIND_LABELS } from './viralAffirmations';
+import type { ClientEvents, ServerEvents, GroupVibe, RelationKind } from './types';
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +21,7 @@ const io = new Server<ClientEvents, ServerEvents>(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  maxHttpBufferSize: 5e6, // 5MB (para selfies en base64 hasta ~3.5MB)
 });
 
 const roomManager = new RoomManager();
@@ -30,7 +31,6 @@ app.get('/', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// ═══════════ DEBUG (solo dev) ═══════════
 if (process.env.NODE_ENV !== 'production') {
   app.get('/debug/:roomId', (_req, res) => {
     const room = roomManager.getRoom(_req.params.roomId.toUpperCase());
@@ -46,17 +46,23 @@ if (process.env.NODE_ENV !== 'production') {
         isHost: p.isHost,
         questionnaireReady: p.questionnaireReady,
         hasProfile: !!p.profile,
-        profile: p.profile,
+        profile: p.profile ? { ...p.profile, selfieBase64: p.profile.selfieBase64 ? `(${p.profile.selfieBase64.length} chars)` : undefined } : null,
       })),
       currentAffirmation: room.currentAffirmation,
+      currentRelationType: room.currentRelationType,
     });
   });
 }
 
-// ═══════════ INPUT VALIDATION ═══════════
-const LIMITS = { playerName: 30, roomId: 12 };
+// ═══════════ VALIDATION ═══════════
+const LIMITS = {
+  playerName: 30,
+  roomId: 12,
+  selfieBase64: 3_500_000,  // ~2.5MB de imagen JPEG/PNG
+};
 
-const VALID_RELATIONS = Object.keys(RELATION_CONFIG) as RelationType[];
+const VALID_GROUP_VIBES = Object.keys(GROUP_VIBE_CONFIG) as GroupVibe[];
+const VALID_RELATION_KINDS = Object.keys(RELATION_KIND_LABELS) as RelationKind[];
 const VALID_GENDERS = ['hombre', 'mujer', 'otro'] as const;
 const VALID_LEVELS = ['suave', 'picante', 'extrema'] as const;
 
@@ -128,26 +134,50 @@ io.on('connection', (socket) => {
     if (settings.level && VALID_LEVELS.includes(settings.level as any)) {
       cleaned.level = settings.level;
     }
-    if (settings.relationType && VALID_RELATIONS.includes(settings.relationType as any)) {
-      cleaned.relationType = settings.relationType;
+    if (settings.groupVibe && VALID_GROUP_VIBES.includes(settings.groupVibe as any)) {
+      cleaned.groupVibe = settings.groupVibe;
     }
     room.updateSettings(cleaned);
     io.to(roomId).emit('ROOM_UPDATE', room.getLobbyState());
   });
 
-  // ═══════════ CUESTIONARIO (super simple ahora) ═══════════
+  // ═══════════ CUESTIONARIO ═══════════
 
   socket.on('SUBMIT_PROFILE', ({ roomId, profile }) => {
-    if (!checkRate(socket.id, 5, 60_000)) return;
+    if (!checkRate(socket.id, 8, 60_000)) return;
     const room = roomManager.getRoom(roomId);
     if (!room) return;
     if (!profile || typeof profile !== 'object') return;
+
+    const otherNames = new Set(
+      room.players.filter(p => p.socketId !== socket.id).map(p => p.name)
+    );
+
+    // Validar relationships: solo otras names existentes y kinds válidos
+    const cleanRelationships: Record<string, RelationKind> = {};
+    if (profile.relationships && typeof profile.relationships === 'object') {
+      for (const [name, kind] of Object.entries(profile.relationships)) {
+        if (otherNames.has(name) && VALID_RELATION_KINDS.includes(kind as any)) {
+          cleanRelationships[name] = kind as RelationKind;
+        }
+      }
+    }
+
+    // Validar selfie (opcional, max LIMITS.selfieBase64)
+    let cleanSelfie: string | undefined;
+    if (typeof profile.selfieBase64 === 'string' && profile.selfieBase64.length > 0) {
+      if (profile.selfieBase64.length <= LIMITS.selfieBase64) {
+        cleanSelfie = profile.selfieBase64;
+      }
+    }
 
     const cleanProfile = {
       gender: VALID_GENDERS.includes(profile.gender as any) ? profile.gender : 'otro',
       role: typeof profile.role === 'string' && profile.role.length <= 30
         ? profile.role.trim()
         : undefined,
+      relationships: cleanRelationships,
+      selfieBase64: cleanSelfie,
     };
 
     room.submitProfile(socket.id, cleanProfile as any);

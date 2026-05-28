@@ -8,7 +8,7 @@
  * se llenan con las afirmaciones ya curadas en sesiones de desarrollo / grabaciones.
  */
 
-import type { RelationType } from './types';
+import type { RelationType, RelationKind, GroupVibe } from './types';
 import scenePromptsData from './scenePrompts.json';
 
 export interface ViralAffirmation {
@@ -384,9 +384,156 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
   ],
 };
 
+// ═══════════ RELATION KIND CONFIG (user-facing dropdown) ═══════════
+
+export const RELATION_KIND_LABELS: Record<RelationKind, string> = {
+  pareja: 'Mi pareja',
+  ex_pareja: 'Mi ex pareja',
+  mejor_amigo: 'Mi mejor amig@',
+  amigo: 'Amig@',
+  hermano: 'Herman@',
+  mama: 'Mi mamá',
+  papa: 'Mi papá',
+  hijo: 'Mi hij@',
+  suegra: 'Mi suegra',
+  suegro: 'Mi suegro',
+  nuera: 'Mi nuera',
+  yerno: 'Mi yerno',
+  roomie: 'Mi roomie',
+  jefe: 'Mi jefe/jefa',
+  empleado: 'Mi emplead@',
+  profesor: 'Mi maestr@/profesor@',
+  exalumno: 'Mi ex-alumn@',
+  companero_trabajo: 'Compañer@ de trabajo',
+  crush: 'Nos gustamos (crush)',
+  rival: 'Rival',
+  conocido: 'Conocid@',
+  otro: 'Otro',
+};
+
+// ═══════════ GROUP VIBE CONFIG (host classification) ═══════════
+
+export const GROUP_VIBE_CONFIG: Record<GroupVibe, { label: string; fallback: RelationType }> = {
+  amigos_h:        { label: 'Grupo de amigos (hombres)',         fallback: 'mejores_amigos_hh' },
+  amigos_m:        { label: 'Grupo de amigas (mujeres)',         fallback: 'mejores_amigas_mm' },
+  amigos_mixto:    { label: 'Grupo mixto de amigos',             fallback: 'amigos_generico' },
+  parejas_amigas:  { label: 'Parejas que son amigas entre sí',   fallback: 'amigos_generico' },
+  oficina:         { label: 'Colegas de trabajo / oficina',      fallback: 'companeros_trabajo' },
+  familia:         { label: 'Reunión familiar',                  fallback: 'amigos_generico' },
+  evento_social:   { label: 'Evento social (cumple, fiesta…)',   fallback: 'amigos_generico' },
+};
+
+// ═══════════ RESOLVER: RelationKind + géneros → RelationType (pool key) ═══════════
+
+type Gender = 'hombre' | 'mujer' | 'otro';
+
 /**
- * Devuelve el pool filtrado por nivel para un RelationType dado.
- * Si la categoría está vacía, cae a amigos_generico.
+ * Mapea un RelationKind (lo que el jugador dijo) + los géneros de ambos jugadores
+ * al RelationType (pool curado) que se va a usar.
+ *
+ * Reglas:
+ * - Para relaciones simétricas (pareja, mejor_amigo, hermano), se afina por género.
+ * - Para relaciones jerárquicas (mamá, jefe, suegra), se infiere quién es {yo} y quién {otro}
+ *   por el rol que se especificó.
+ * - Cuando el pool elegido está vacío en VIRAL_AFFIRMATIONS, el caller hace fallback al
+ *   pool de la GroupVibe.
+ */
+export function resolveRelationToPool(
+  kindA: RelationKind | undefined,
+  kindB: RelationKind | undefined,
+  genderA: Gender,
+  genderB: Gender,
+): RelationType {
+  // Prioridad: usar la más específica si reportan distinto; si solo uno reportó, usar esa
+  const kind = pickMostSpecific(kindA, kindB);
+
+  switch (kind) {
+    case 'pareja':
+      if (genderA === 'hombre' && genderB === 'hombre') return 'novios_gay';
+      if (genderA === 'mujer' && genderB === 'mujer') return 'novias_lesbianas';
+      return 'novios_hetero';
+
+    case 'ex_pareja':
+      return 'ex_pareja';
+
+    case 'mejor_amigo':
+      if (genderA === 'hombre' && genderB === 'hombre') return 'mejores_amigos_hh';
+      if (genderA === 'mujer' && genderB === 'mujer') return 'mejores_amigas_mm';
+      return 'amigos_hm';
+
+    case 'amigo':
+      return 'amigos_generico';
+
+    case 'hermano':
+      if (genderA === 'hombre' && genderB === 'hombre') return 'hermanos_hh';
+      if (genderA === 'mujer' && genderB === 'mujer') return 'hermanos_mm';
+      return 'hermanos_hm';
+
+    case 'mama':
+    case 'hijo':
+      // mama → hijo o mama → hija
+      if (genderA === 'mujer' && genderB === 'mujer') return 'madre_hija';
+      return 'madre_hijo';
+
+    case 'papa':
+      if (genderA === 'hombre' && genderB === 'mujer') return 'padre_hija';
+      if (genderA === 'mujer' && genderB === 'hombre') return 'padre_hija'; // hija perspective
+      return 'padre_hijo';
+
+    case 'suegra':
+    case 'nuera':
+      return 'suegra_nuera';
+
+    case 'suegro':
+    case 'yerno':
+      return 'suegro_yerno';
+
+    case 'roomie':
+      if (genderA === 'hombre' && genderB === 'hombre') return 'roomies_hh';
+      if (genderA === 'mujer' && genderB === 'mujer') return 'roomies_mm';
+      return 'roomies_hm';
+
+    case 'jefe':
+    case 'empleado':
+      return 'jefe_empleado';
+
+    case 'profesor':
+    case 'exalumno':
+      return 'profesor_exalumno';
+
+    case 'companero_trabajo':
+      return 'companeros_trabajo';
+
+    case 'crush':
+      return 'se_gustan';
+
+    case 'rival':
+      return 'rivalidad';
+
+    case 'conocido':
+    case 'otro':
+    default:
+      return 'amigos_generico';
+  }
+}
+
+// Específicos ganan a genéricos (pareja > crush > amigo > conocido)
+function pickMostSpecific(a: RelationKind | undefined, b: RelationKind | undefined): RelationKind {
+  const score: Record<RelationKind, number> = {
+    pareja: 10, ex_pareja: 9, crush: 8, suegra: 8, suegro: 8, nuera: 8, yerno: 8,
+    mama: 8, papa: 8, hijo: 8, hermano: 8, jefe: 7, empleado: 7, profesor: 7, exalumno: 7,
+    mejor_amigo: 6, roomie: 6, companero_trabajo: 5, rival: 5,
+    amigo: 4, conocido: 2, otro: 1,
+  };
+  if (!a && !b) return 'conocido';
+  if (!a) return b!;
+  if (!b) return a;
+  return (score[a] >= score[b]) ? a : b;
+}
+
+/**
+ * Devuelve pool por RelationType (cae a amigos_generico si está vacío).
+ * Útil para llamadas directas. Para una pareja en runtime, usar `getPoolForPair`.
  */
 export function getPoolFor(relationType: RelationType, level: 'suave' | 'picante' | 'extrema'): ViralAffirmation[] {
   const pool = VIRAL_AFFIRMATIONS[relationType] || [];
@@ -395,6 +542,29 @@ export function getPoolFor(relationType: RelationType, level: 'suave' | 'picante
     return VIRAL_AFFIRMATIONS.amigos_generico.filter(a => a.level === 'all' || a.level === level);
   }
   return filtered;
+}
+
+/**
+ * Para un par específico de jugadores (con sus relaciones reportadas y géneros),
+ * devuelve el pool relevante. Si el pool específico está vacío, cae al pool de la GroupVibe.
+ */
+export function getPoolForPair(
+  kindA: RelationKind | undefined,
+  kindB: RelationKind | undefined,
+  genderA: Gender,
+  genderB: Gender,
+  level: 'suave' | 'picante' | 'extrema',
+  groupVibe: GroupVibe,
+): { pool: ViralAffirmation[]; relationType: RelationType } {
+  const relationType = resolveRelationToPool(kindA, kindB, genderA, genderB);
+  const specific = (VIRAL_AFFIRMATIONS[relationType] || []).filter(a => a.level === 'all' || a.level === level);
+  if (specific.length > 0) return { pool: specific, relationType };
+
+  // Fallback al pool de groupVibe
+  const fallbackKey = GROUP_VIBE_CONFIG[groupVibe]?.fallback || 'amigos_generico';
+  const fallback = (VIRAL_AFFIRMATIONS[fallbackKey] || VIRAL_AFFIRMATIONS.amigos_generico)
+    .filter(a => a.level === 'all' || a.level === level);
+  return { pool: fallback, relationType: fallbackKey };
 }
 
 /**

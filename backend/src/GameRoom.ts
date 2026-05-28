@@ -1,9 +1,11 @@
 import { customAlphabet } from 'nanoid';
 import { AFFIRMATIONS } from './affirmations';
-import { getPoolFor, fillTemplate, RELATION_CONFIG, ViralAffirmation } from './viralAffirmations';
+import {
+  getPoolForPair, fillTemplate, GROUP_VIBE_CONFIG, ViralAffirmation
+} from './viralAffirmations';
 import type {
   Player, GameSettings, GamePhase, RoundResults, ScoreEntry,
-  PlayerProfile, AffirmationType, RelationType,
+  PlayerProfile, AffirmationType, RelationType, GroupVibe,
 } from './types';
 
 const generateId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 10);
@@ -22,9 +24,10 @@ export class GameRoom {
   currentAffirmation: string = '';
   currentAffirmationType: AffirmationType = 'general';
   currentTruth: boolean | null = null;
+  currentRelationType: RelationType = 'amigos_generico';
+  currentOtherPlayerName: string = '';
 
-  // Pool de afirmaciones (solo viral + fallback genérico)
-  private viralPool: ViralAffirmation[] = [];
+  // Pool tracking
   private usedTemplates: Set<string> = new Set();
   private fallbackPool: string[] = [];
 
@@ -39,7 +42,7 @@ export class GameRoom {
     this.hostId = hostId;
     this.settings = {
       level: settings.level || 'picante',
-      relationType: settings.relationType || 'amigos_generico',
+      groupVibe: settings.groupVibe || 'amigos_mixto',
       timerSeconds: 30,
     };
     this.addPlayer(hostId, hostName, true);
@@ -72,7 +75,7 @@ export class GameRoom {
 
   updateSettings(settings: Partial<GameSettings>) {
     if (settings.level) this.settings.level = settings.level;
-    if (settings.relationType) this.settings.relationType = settings.relationType;
+    if (settings.groupVibe) this.settings.groupVibe = settings.groupVibe;
     this.touch();
   }
 
@@ -98,62 +101,93 @@ export class GameRoom {
 
   // ═══════════ POOL DE AFIRMACIONES ═══════════
 
-  /** Inicializa el pool al empezar el juego. Sin IA, sin regex. */
   initPool() {
-    this.viralPool = getPoolFor(this.settings.relationType, this.settings.level);
     this.fallbackPool = [...(AFFIRMATIONS[this.settings.level] || [])];
-    this.shuffleArray(this.viralPool);
     this.shuffleArray(this.fallbackPool);
     this.usedTemplates.clear();
-    console.log(`📋 Pool inicial para ${this.settings.relationType} (${this.settings.level}): ${this.viralPool.length} virales + ${this.fallbackPool.length} fallback`);
+    console.log(`📋 Pool inicial — groupVibe: ${this.settings.groupVibe} | ${this.fallbackPool.length} fallback genéricas`);
   }
 
+  /**
+   * Elige al otro jugador con quien se construye la afirmación interpersonal.
+   * Preferencia:
+   *   1) Alguien con quien el current player tenga una relación REPORTADA específica (no 'conocido'/'otro')
+   *   2) Cualquier otro jugador
+   */
   private pickOtroFor(currentPlayer: Player): Player {
-    // Si la relación tiene roles, intentar elegir un player con rol distinto
-    const config = RELATION_CONFIG[this.settings.relationType];
     const others = this.players.filter(p => p.socketId !== currentPlayer.socketId);
+    const rels = currentPlayer.profile?.relationships || {};
 
-    if (config?.roles && currentPlayer.profile?.role) {
-      const counterRole = config.roles.find(r => r !== currentPlayer.profile?.role);
-      const match = others.find(p => p.profile?.role === counterRole);
-      if (match) return match;
-    }
+    const withSpecificRel = others.filter(p => {
+      const r = rels[p.name];
+      return r && r !== 'conocido' && r !== 'otro';
+    });
 
-    return others[Math.floor(Math.random() * others.length)];
+    const candidates = withSpecificRel.length > 0 ? withSpecificRel : others;
+    return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
   private pickAffirmation(): void {
     const currentPlayer = this.players[this.currentPlayerIndex];
     const otro = this.pickOtroFor(currentPlayer);
 
-    // Buscar primero en pool viral
-    const availableViral = this.viralPool.filter(a => !this.usedTemplates.has(a.text));
-
-    if (availableViral.length > 0) {
-      const chosen = availableViral[Math.floor(Math.random() * availableViral.length)];
-      this.usedTemplates.add(chosen.text);
-      this.currentAffirmation = fillTemplate(chosen.text, currentPlayer.name, otro?.name || 'alguien');
-      this.currentAffirmationType = chosen.text.includes('{otro}') ? 'interpersonal' : 'general';
-      console.log(`🎯 Viral: "${this.currentAffirmation}"`);
+    if (!otro) {
+      // Sala con 1 jugador (edge case) — pick from fallback genérico
+      this.pickFromFallback(currentPlayer);
       return;
     }
 
-    // Fallback al pool genérico
-    const availableFallback = this.fallbackPool.filter(t => !this.usedTemplates.has(t));
-    if (availableFallback.length === 0) {
-      // Se acabó todo → reciclar
-      this.usedTemplates.clear();
-      this.shuffleArray(this.viralPool);
-      this.shuffleArray(this.fallbackPool);
-      return this.pickAffirmation();
+    // Resolver pool basado en la relación específica entre estos dos
+    const kindA = currentPlayer.profile?.relationships?.[otro.name];
+    const kindB = otro.profile?.relationships?.[currentPlayer.name];
+    const genderA = currentPlayer.profile?.gender || 'otro';
+    const genderB = otro.profile?.gender || 'otro';
+
+    const { pool, relationType } = getPoolForPair(
+      kindA, kindB, genderA, genderB,
+      this.settings.level, this.settings.groupVibe,
+    );
+
+    const available = pool.filter(a => !this.usedTemplates.has(a.text));
+
+    if (available.length > 0) {
+      const chosen = available[Math.floor(Math.random() * available.length)];
+      this.usedTemplates.add(chosen.text);
+      this.currentAffirmation = fillTemplate(chosen.text, currentPlayer.name, otro.name);
+      this.currentAffirmationType = chosen.text.includes('{otro}') ? 'interpersonal' : 'general';
+      this.currentRelationType = relationType;
+      this.currentOtherPlayerName = otro.name;
+      console.log(`🎯 [${relationType}] (${currentPlayer.name} → ${otro.name}): "${this.currentAffirmation}"`);
+      return;
     }
 
-    const template = availableFallback[Math.floor(Math.random() * availableFallback.length)];
+    // Si el pool específico ya se agotó, intentar pool de groupVibe como respaldo,
+    // y si todo se agota, reciclar usados.
+    this.pickFromFallback(currentPlayer, otro);
+  }
+
+  private pickFromFallback(currentPlayer: Player, otro?: Player): void {
+    const available = this.fallbackPool.filter(t => !this.usedTemplates.has(t));
+    if (available.length === 0) {
+      // Se acabó todo → reciclar
+      this.usedTemplates.clear();
+      this.shuffleArray(this.fallbackPool);
+      // Re-intentar una vez (sin recursión infinita: si fallback está vacío, abort)
+      if (this.fallbackPool.length === 0) {
+        this.currentAffirmation = 'Se acabaron las afirmaciones.';
+        this.currentAffirmationType = 'general';
+        return;
+      }
+      return this.pickFromFallback(currentPlayer, otro);
+    }
+    const template = available[Math.floor(Math.random() * available.length)];
     this.usedTemplates.add(template);
     const playerNames = this.players.map(p => p.name);
     const text = template.replace(/\{nombre\}/g, () => playerNames[Math.floor(Math.random() * playerNames.length)]);
     this.currentAffirmation = text;
     this.currentAffirmationType = 'general';
+    this.currentRelationType = 'amigos_generico';
+    this.currentOtherPlayerName = otro?.name || '';
     console.log(`📦 Fallback: "${this.currentAffirmation}"`);
   }
 
@@ -183,6 +217,14 @@ export class GameRoom {
 
   getCurrentPlayerName(): string {
     return this.players[this.currentPlayerIndex].name;
+  }
+
+  getCurrentPlayer(): Player {
+    return this.players[this.currentPlayerIndex];
+  }
+
+  getOtherPlayer(): Player | undefined {
+    return this.players.find(p => p.name === this.currentOtherPlayerName);
   }
 
   // ═══════════ FASE 2: CONFIRMACIÓN ═══════════
@@ -232,7 +274,6 @@ export class GameRoom {
     const truthAnswer = this.currentTruth ? 'verdad' : 'mentira';
     const voters = this.players.filter(p => p.socketId !== this.getCurrentPlayerId());
     const currentPlayer = this.players[this.currentPlayerIndex];
-
     const wrongAnswer: 'verdad' | 'mentira' = truthAnswer === 'verdad' ? 'mentira' : 'verdad';
 
     const guesses = voters.map(p => ({
@@ -280,7 +321,7 @@ export class GameRoom {
     }, 10_000);
   }
 
-  // ═══════════ ESTADOS PARA EMITIR ═══════════
+  // ═══════════ STATE EMITS ═══════════
 
   getScoreboard(): ScoreEntry[] {
     return this.players

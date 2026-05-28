@@ -10,55 +10,51 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 export type GamePhase = 'landing' | 'lobby' | 'questionnaire' | 'confirming' | 'guessing' | 'reveal';
 export type AffirmationType = 'general' | 'interpersonal';
 
-export type RelationType =
-  | 'novios_hetero' | 'novios_gay' | 'novias_lesbianas' | 'ex_pareja' | 'se_gustan'
-  | 'mejores_amigos_hh' | 'mejores_amigas_mm' | 'amigos_hm' | 'amigos_generico' | 'rivalidad'
-  | 'hermanos_hh' | 'hermanos_mm' | 'hermanos_hm'
-  | 'madre_hija' | 'madre_hijo' | 'padre_hijo' | 'padre_hija'
-  | 'suegra_nuera' | 'suegro_yerno'
-  | 'roomies_hh' | 'roomies_mm' | 'roomies_hm'
-  | 'jefe_empleado' | 'profesor_exalumno' | 'companeros_trabajo';
+export type RelationKind =
+  | 'pareja' | 'ex_pareja' | 'mejor_amigo' | 'amigo' | 'hermano'
+  | 'mama' | 'papa' | 'hijo'
+  | 'suegra' | 'suegro' | 'nuera' | 'yerno'
+  | 'roomie' | 'jefe' | 'empleado' | 'profesor' | 'exalumno'
+  | 'companero_trabajo' | 'crush' | 'rival' | 'conocido' | 'otro';
 
-export interface RelationOption {
-  key: RelationType;
-  label: string;
-  group: string;
-  roles?: [string, string];
-  ready: boolean;
-}
-
-// Mirror del RELATION_CONFIG del backend (mantener sincronizado)
-export const RELATION_OPTIONS: RelationOption[] = [
-  { key: 'novios_hetero',      label: 'Pareja (hombre y mujer)', group: 'Parejas',      ready: true },
-  { key: 'novios_gay',         label: 'Pareja (dos hombres)',    group: 'Parejas',      ready: true },
-  { key: 'novias_lesbianas',   label: 'Pareja (dos mujeres)',    group: 'Parejas',      ready: true },
-  { key: 'ex_pareja',          label: 'Ex-pareja',               group: 'Parejas',      ready: true },
-  { key: 'se_gustan',          label: 'Se gustan / hay tensión', group: 'Parejas',      ready: true },
-  { key: 'mejores_amigos_hh',  label: 'Mejores amigos (H-H)',    group: 'Amistad',      ready: true },
-  { key: 'mejores_amigas_mm',  label: 'Mejores amigas (M-M)',    group: 'Amistad',      ready: true },
-  { key: 'amigos_hm',          label: 'Amigo y amiga (H-M)',     group: 'Amistad',      ready: true },
-  { key: 'amigos_generico',    label: 'Amigos (grupo)',          group: 'Amistad',      ready: true },
-  { key: 'rivalidad',          label: 'Rivalidad',               group: 'Amistad',      ready: true },
-  { key: 'hermanos_hh',        label: 'Hermanos (H-H)',          group: 'Familia',      ready: false },
-  { key: 'hermanos_mm',        label: 'Hermanas (M-M)',          group: 'Familia',      ready: false },
-  { key: 'hermanos_hm',        label: 'Hermano y hermana',       group: 'Familia',      ready: false },
-  { key: 'madre_hija',         label: 'Madre e hija',            group: 'Familia',      roles: ['madre','hija'],   ready: false },
-  { key: 'madre_hijo',         label: 'Madre e hijo',            group: 'Familia',      roles: ['madre','hijo'],   ready: false },
-  { key: 'padre_hijo',         label: 'Padre e hijo',            group: 'Familia',      roles: ['padre','hijo'],   ready: false },
-  { key: 'padre_hija',         label: 'Padre e hija',            group: 'Familia',      roles: ['padre','hija'],   ready: false },
-  { key: 'suegra_nuera',       label: 'Suegra y nuera',          group: 'Familia',      roles: ['suegra','nuera'], ready: false },
-  { key: 'suegro_yerno',       label: 'Suegro y yerno',          group: 'Familia',      roles: ['suegro','yerno'], ready: false },
-  { key: 'roomies_hh',         label: 'Roomies (H-H)',           group: 'Convivencia',  ready: false },
-  { key: 'roomies_mm',         label: 'Roomies (M-M)',           group: 'Convivencia',  ready: false },
-  { key: 'roomies_hm',         label: 'Roomies (H-M)',           group: 'Convivencia',  ready: false },
-  { key: 'jefe_empleado',      label: 'Jefe y empleado',         group: 'Trabajo',      roles: ['jefe','empleado'],     ready: false },
-  { key: 'profesor_exalumno',  label: 'Profesor y ex-alumno',    group: 'Trabajo',      roles: ['profesor','ex-alumno'], ready: false },
-  { key: 'companeros_trabajo', label: 'Compañeros de trabajo',   group: 'Trabajo',      ready: true },
+export const RELATION_KIND_OPTIONS: { key: RelationKind; label: string; group: string }[] = [
+  { key: 'pareja',             label: 'Mi pareja',                   group: 'Romántico' },
+  { key: 'ex_pareja',          label: 'Mi ex pareja',                group: 'Romántico' },
+  { key: 'crush',              label: 'Nos gustamos (crush)',        group: 'Romántico' },
+  { key: 'mejor_amigo',        label: 'Mi mejor amig@',              group: 'Amistad' },
+  { key: 'amigo',              label: 'Amig@',                       group: 'Amistad' },
+  { key: 'rival',              label: 'Rival',                       group: 'Amistad' },
+  { key: 'hermano',            label: 'Herman@',                     group: 'Familia' },
+  { key: 'mama',               label: 'Mi mamá',                     group: 'Familia' },
+  { key: 'papa',               label: 'Mi papá',                     group: 'Familia' },
+  { key: 'hijo',               label: 'Mi hij@',                     group: 'Familia' },
+  { key: 'suegra',             label: 'Mi suegra',                   group: 'Familia política' },
+  { key: 'suegro',             label: 'Mi suegro',                   group: 'Familia política' },
+  { key: 'nuera',              label: 'Mi nuera',                    group: 'Familia política' },
+  { key: 'yerno',              label: 'Mi yerno',                    group: 'Familia política' },
+  { key: 'roomie',             label: 'Mi roomie',                   group: 'Convivencia' },
+  { key: 'jefe',               label: 'Mi jefe/jefa',                group: 'Trabajo' },
+  { key: 'empleado',           label: 'Mi emplead@',                 group: 'Trabajo' },
+  { key: 'profesor',           label: 'Mi maestr@',                  group: 'Trabajo' },
+  { key: 'exalumno',           label: 'Mi ex-alumn@',                group: 'Trabajo' },
+  { key: 'companero_trabajo',  label: 'Compañer@ de trabajo',        group: 'Trabajo' },
+  { key: 'conocido',           label: 'Conocid@',                    group: 'Otros' },
+  { key: 'otro',               label: 'Otro',                        group: 'Otros' },
 ];
 
-export const RELATION_BY_KEY: Record<RelationType, RelationOption> = Object.fromEntries(
-  RELATION_OPTIONS.map(o => [o.key, o])
-) as Record<RelationType, RelationOption>;
+export type GroupVibe =
+  | 'amigos_h' | 'amigos_m' | 'amigos_mixto' | 'parejas_amigas'
+  | 'oficina' | 'familia' | 'evento_social';
+
+export const GROUP_VIBE_OPTIONS: { key: GroupVibe; label: string }[] = [
+  { key: 'amigos_mixto',   label: 'Grupo mixto de amigos' },
+  { key: 'amigos_h',       label: 'Grupo de amigos (hombres)' },
+  { key: 'amigos_m',       label: 'Grupo de amigas (mujeres)' },
+  { key: 'parejas_amigas', label: 'Parejas que son amigas entre sí' },
+  { key: 'oficina',        label: 'Colegas de trabajo / oficina' },
+  { key: 'familia',        label: 'Reunión familiar' },
+  { key: 'evento_social',  label: 'Evento social (fiesta, cumple…)' },
+];
 
 export interface PlayerInfo {
   name: string;
@@ -71,7 +67,7 @@ export interface RoomState {
   id: string;
   hostId: string;
   players: PlayerInfo[];
-  settings: { level: 'suave'|'picante'|'extrema'; relationType: RelationType; timerSeconds: number };
+  settings: { level: 'suave' | 'picante' | 'extrema'; groupVibe: GroupVibe; timerSeconds: number };
   phase: string;
   playerCount: number;
   questionnaireProgress: { ready: number; total: number };
@@ -84,6 +80,7 @@ export interface TurnData {
   round: number;
   phase: string;
   type: AffirmationType;
+  imageBase64?: string;
 }
 
 export interface GuessResult {
@@ -99,6 +96,7 @@ export interface RevealData {
   drinkers: string[];
   reason: 'all_correct' | 'all_wrong' | 'mixed';
   type: AffirmationType;
+  imageBase64?: string;
 }
 
 export interface ScoreEntry {
@@ -110,6 +108,8 @@ export interface ScoreEntry {
 export interface PlayerProfile {
   gender: 'hombre' | 'mujer' | 'otro';
   role?: string;
+  relationships: Record<string, RelationKind>;
+  selfieBase64?: string;
 }
 
 // ═══════════ HOOK ═══════════
@@ -167,6 +167,12 @@ export function useGameSocket() {
       setHasConfirmed(false);
       if (data.phase === 'confirming') setPhase('confirming');
       else if (data.phase === 'guessing') setPhase('guessing');
+    });
+
+    socket.on('IMAGE_READY', (data: { round: number; imageBase64: string }) => {
+      // Late-arriving image for current turn — patch into turnData
+      setTurnData(prev => prev && prev.round === data.round ? { ...prev, imageBase64: data.imageBase64 } : prev);
+      setRevealData(prev => prev ? { ...prev, imageBase64: data.imageBase64 } : prev);
     });
 
     socket.on('PLAYER_CONFIRMED', () => setPhase('guessing'));
