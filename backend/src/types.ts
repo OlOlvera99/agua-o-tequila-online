@@ -136,6 +136,7 @@ export interface ServerEvents {
   ROOM_UPDATE: (state: any) => void;
   QUESTIONNAIRE_START: (data: { players: string[] }) => void;
   QUESTIONNAIRE_PROGRESS: (data: { ready: number; total: number }) => void;
+  STARTING_GAME: () => void;  // host clickeó Empezar, server pre-genera primeros turnos
   NEW_TURN: (data: {
     currentPlayer: string;
     affirmation: string;

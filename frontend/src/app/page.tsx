@@ -4,6 +4,7 @@ import { useGameSocket } from '@/hooks/useGameSocket';
 import LandingView from '@/components/LandingView';
 import LobbyView from '@/components/LobbyView';
 import QuestionnaireView from '@/components/QuestionnaireView';
+import StartingView from '@/components/StartingView';
 import ConfirmView from '@/components/ConfirmView';
 import GuessingView from '@/components/GuessingView';
 import RevealView from '@/components/RevealView';
@@ -45,6 +46,7 @@ export default function Home() {
       {game.phase === 'landing' && <LandingView game={game} />}
       {game.phase === 'lobby' && <LobbyView game={game} />}
       {game.phase === 'questionnaire' && <QuestionnaireView game={game} />}
+      {game.phase === 'starting' && <StartingView />}
       {game.phase === 'confirming' && <ConfirmView game={game} />}
       {game.phase === 'guessing' && <GuessingView game={game} />}
       {game.phase === 'reveal' && <RevealView game={game} />}

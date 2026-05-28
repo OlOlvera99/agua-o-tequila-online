@@ -10,6 +10,23 @@ import type {
 
 const generateId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 10);
 
+/**
+ * Un turno preparado pero todavía no jugado.
+ * Permite pre-generar imágenes mientras se juegan turnos anteriores.
+ */
+export interface PendingTurn {
+  round: number;
+  yoSocketId: string;
+  yoName: string;
+  otroName: string;
+  template: string;          // texto con {yo}/{otro}
+  affirmation: string;       // texto ya rellenado
+  type: AffirmationType;
+  relationType: RelationType;
+  imageBase64?: string;
+  imageGenStarted: boolean;
+}
+
 export class GameRoom {
   id: string;
   hostId: string;
@@ -18,16 +35,21 @@ export class GameRoom {
   settings: GameSettings;
   lastActivity: number = Date.now();
 
-  // Turno
+  // Turno actual
   round: number = 0;
   currentPlayerIndex: number = -1;
   currentAffirmation: string = '';
-  currentAffirmationTemplate: string = ''; // texto con {yo}/{otro} sin rellenar (para image-gen)
+  currentAffirmationTemplate: string = '';
   currentAffirmationType: AffirmationType = 'general';
   currentTruth: boolean | null = null;
   currentRelationType: RelationType = 'amigos_generico';
   currentOtherPlayerName: string = '';
   currentImageBase64: string = '';
+
+  // ═══════════ COLA DE TURNOS PRE-COMPUTADOS ═══════════
+  // Permite pre-generar imágenes mientras se juega.
+  upcomingTurns: PendingTurn[] = [];
+  readonly LOOKAHEAD = 3;
 
   // Pool tracking
   private usedTemplates: Set<string> = new Set();
@@ -107,42 +129,42 @@ export class GameRoom {
     this.fallbackPool = [...(AFFIRMATIONS[this.settings.level] || [])];
     this.shuffleArray(this.fallbackPool);
     this.usedTemplates.clear();
+    this.upcomingTurns = [];
     console.log(`📋 Pool inicial — groupVibe: ${this.settings.groupVibe} | ${this.fallbackPool.length} fallback genéricas`);
   }
 
   /**
-   * Elige al otro jugador con quien se construye la afirmación interpersonal.
-   * Preferencia:
-   *   1) Alguien con quien el current player tenga una relación REPORTADA específica (no 'conocido'/'otro')
-   *   2) Cualquier otro jugador
+   * Pre-computa los siguientes N turnos (afirmación + yo + otro) y los mete a la cola.
+   * NO inicia generación de imagen — eso lo hace el server.
    */
-  private pickOtroFor(currentPlayer: Player): Player {
-    const others = this.players.filter(p => p.socketId !== currentPlayer.socketId);
-    const rels = currentPlayer.profile?.relationships || {};
-
-    const withSpecificRel = others.filter(p => {
-      const r = rels[p.name];
-      return r && r !== 'conocido' && r !== 'otro';
-    });
-
-    const candidates = withSpecificRel.length > 0 ? withSpecificRel : others;
-    return candidates[Math.floor(Math.random() * candidates.length)];
+  precomputeUpcoming(n: number = this.LOOKAHEAD): PendingTurn[] {
+    const newlyAdded: PendingTurn[] = [];
+    while (this.upcomingTurns.length < n) {
+      const offset = this.upcomingTurns.length + 1;
+      const nextRound = this.round + offset;
+      const nextPlayerIdx = (this.currentPlayerIndex + offset) % this.players.length;
+      const turn = this.buildTurnForPlayer(nextRound, nextPlayerIdx);
+      if (!turn) break;
+      this.upcomingTurns.push(turn);
+      newlyAdded.push(turn);
+    }
+    return newlyAdded;
   }
 
-  private pickAffirmation(): void {
-    const currentPlayer = this.players[this.currentPlayerIndex];
-    const otro = this.pickOtroFor(currentPlayer);
+  /** Construye un PendingTurn sin mutar currentPlayerIndex/round. */
+  private buildTurnForPlayer(roundNum: number, yoIdx: number): PendingTurn | null {
+    const yoPlayer = this.players[yoIdx];
+    if (!yoPlayer) return null;
+    const otro = this.pickOtroFor(yoPlayer);
 
     if (!otro) {
-      // Sala con 1 jugador (edge case) — pick from fallback genérico
-      this.pickFromFallback(currentPlayer);
-      return;
+      // 1 jugador — fallback genérico
+      return this.buildFallbackTurn(roundNum, yoPlayer, null);
     }
 
-    // Resolver pool basado en la relación específica entre estos dos
-    const kindA = currentPlayer.profile?.relationships?.[otro.name];
-    const kindB = otro.profile?.relationships?.[currentPlayer.name];
-    const genderA = currentPlayer.profile?.gender || 'otro';
+    const kindA = yoPlayer.profile?.relationships?.[otro.name];
+    const kindB = otro.profile?.relationships?.[yoPlayer.name];
+    const genderA = yoPlayer.profile?.gender || 'otro';
     const genderB = otro.profile?.gender || 'otro';
 
     const { pool, relationType } = getPoolForPair(
@@ -151,54 +173,94 @@ export class GameRoom {
     );
 
     const available = pool.filter(a => !this.usedTemplates.has(a.text));
-
-    if (available.length > 0) {
-      const chosen = available[Math.floor(Math.random() * available.length)];
-      this.usedTemplates.add(chosen.text);
-      this.currentAffirmationTemplate = chosen.text;
-      this.currentAffirmation = fillTemplate(chosen.text, currentPlayer.name, otro.name);
-      this.currentAffirmationType = chosen.text.includes('{otro}') ? 'interpersonal' : 'general';
-      this.currentRelationType = relationType;
-      this.currentOtherPlayerName = otro.name;
-      this.currentImageBase64 = ''; // reset; image arrives async
-      console.log(`🎯 [${relationType}] (${currentPlayer.name} → ${otro.name}): "${this.currentAffirmation}"`);
-      return;
+    if (available.length === 0) {
+      return this.buildFallbackTurn(roundNum, yoPlayer, otro);
     }
 
-    // Si el pool específico ya se agotó, intentar pool de groupVibe como respaldo,
-    // y si todo se agota, reciclar usados.
-    this.pickFromFallback(currentPlayer, otro);
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    this.usedTemplates.add(chosen.text);
+
+    return {
+      round: roundNum,
+      yoSocketId: yoPlayer.socketId,
+      yoName: yoPlayer.name,
+      otroName: otro.name,
+      template: chosen.text,
+      affirmation: fillTemplate(chosen.text, yoPlayer.name, otro.name),
+      type: chosen.text.includes('{otro}') ? 'interpersonal' : 'general',
+      relationType,
+      imageGenStarted: false,
+    };
   }
 
-  private pickFromFallback(currentPlayer: Player, otro?: Player): void {
+  private buildFallbackTurn(roundNum: number, yoPlayer: Player, otro: Player | null): PendingTurn | null {
     const available = this.fallbackPool.filter(t => !this.usedTemplates.has(t));
     if (available.length === 0) {
-      // Se acabó todo → reciclar
+      // Si está vacío, reciclar
       this.usedTemplates.clear();
       this.shuffleArray(this.fallbackPool);
-      // Re-intentar una vez (sin recursión infinita: si fallback está vacío, abort)
-      if (this.fallbackPool.length === 0) {
-        this.currentAffirmation = 'Se acabaron las afirmaciones.';
-        this.currentAffirmationType = 'general';
-        return;
-      }
-      return this.pickFromFallback(currentPlayer, otro);
+      if (this.fallbackPool.length === 0) return null;
+      return this.buildFallbackTurn(roundNum, yoPlayer, otro);
     }
     const template = available[Math.floor(Math.random() * available.length)];
     this.usedTemplates.add(template);
     const playerNames = this.players.map(p => p.name);
     const text = template.replace(/\{nombre\}/g, () => playerNames[Math.floor(Math.random() * playerNames.length)]);
-    this.currentAffirmation = text;
-    this.currentAffirmationTemplate = template;
-    this.currentAffirmationType = 'general';
-    this.currentRelationType = 'amigos_generico';
-    this.currentOtherPlayerName = otro?.name || '';
-    this.currentImageBase64 = '';
-    console.log(`📦 Fallback: "${this.currentAffirmation}"`);
+    return {
+      round: roundNum,
+      yoSocketId: yoPlayer.socketId,
+      yoName: yoPlayer.name,
+      otroName: otro?.name || '',
+      template,
+      affirmation: text,
+      type: 'general',
+      relationType: 'amigos_generico',
+      imageGenStarted: false,
+    };
   }
 
+  /**
+   * Elige al otro jugador con quien se construye la afirmación interpersonal.
+   * Preferencia: alguien con relación específica reportada > cualquier otro.
+   */
+  private pickOtroFor(currentPlayer: Player): Player | undefined {
+    const others = this.players.filter(p => p.socketId !== currentPlayer.socketId);
+    if (others.length === 0) return undefined;
+    const rels = currentPlayer.profile?.relationships || {};
+    const withSpecificRel = others.filter(p => {
+      const r = rels[p.name];
+      return r && r !== 'conocido' && r !== 'otro';
+    });
+    const candidates = withSpecificRel.length > 0 ? withSpecificRel : others;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  /** Marca un PendingTurn como que ya empezó su generación de imagen. */
+  markImageGenStarted(round: number) {
+    const t = this.upcomingTurns.find(t => t.round === round);
+    if (t) t.imageGenStarted = true;
+  }
+
+  /** Guarda la imagen generada en el PendingTurn correspondiente. */
+  setImageForRound(round: number, imageBase64: string) {
+    const t = this.upcomingTurns.find(t => t.round === round);
+    if (t) t.imageBase64 = imageBase64;
+    // Si es el round actual, también update current
+    if (this.round === round) {
+      this.currentImageBase64 = imageBase64;
+    }
+  }
+
+  /** Para regenerar la afirmación actual sin perder el ritmo del pipeline. */
   regenerateAffirmation() {
-    this.pickAffirmation();
+    // Quitar el current de "used"
+    if (this.currentAffirmationTemplate) {
+      this.usedTemplates.delete(this.currentAffirmationTemplate);
+    }
+    const newTurn = this.buildTurnForPlayer(this.round, this.currentPlayerIndex);
+    if (newTurn) {
+      this.applyPendingTurnAsCurrent(newTurn);
+    }
     this.touch();
   }
 
@@ -206,15 +268,41 @@ export class GameRoom {
 
   startNextTurn() {
     this.clearTimers();
-    this.round++;
-    this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    this.players.forEach(p => { p.currentGuess = null; });
     this.currentTruth = null;
     this.phase = 'confirming';
 
-    this.players.forEach(p => { p.currentGuess = null; });
+    // Consumir el siguiente PendingTurn de la cola
+    const next = this.upcomingTurns.shift();
+    if (next) {
+      this.applyPendingTurnAsCurrent(next);
+    } else {
+      // Fallback (cola vacía): construir uno fresco
+      this.round++;
+      this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+      const fresh = this.buildTurnForPlayer(this.round, this.currentPlayerIndex);
+      if (fresh) this.applyPendingTurnAsCurrent(fresh);
+    }
 
-    this.pickAffirmation();
+    // Refill cola
+    this.precomputeUpcoming(this.LOOKAHEAD);
     this.touch();
+  }
+
+  private applyPendingTurnAsCurrent(t: PendingTurn) {
+    this.round = t.round;
+    this.currentPlayerIndex = this.players.findIndex(p => p.socketId === t.yoSocketId);
+    if (this.currentPlayerIndex === -1) {
+      // Player desconectado — usar índice 0 como fallback
+      this.currentPlayerIndex = 0;
+    }
+    this.currentAffirmation = t.affirmation;
+    this.currentAffirmationTemplate = t.template;
+    this.currentAffirmationType = t.type;
+    this.currentRelationType = t.relationType;
+    this.currentOtherPlayerName = t.otroName;
+    this.currentImageBase64 = t.imageBase64 || '';
+    console.log(`🎯 R${t.round} [${t.relationType}] ${t.yoName}→${t.otroName}: "${t.affirmation}"${t.imageBase64 ? ' 🖼️' : ''}`);
   }
 
   getCurrentPlayerId(): string {

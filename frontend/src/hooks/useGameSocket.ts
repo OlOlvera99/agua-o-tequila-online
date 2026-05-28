@@ -7,7 +7,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 
 // ═══════════ TYPES (mirror del backend) ═══════════
 
-export type GamePhase = 'landing' | 'lobby' | 'questionnaire' | 'confirming' | 'guessing' | 'reveal';
+export type GamePhase = 'landing' | 'lobby' | 'questionnaire' | 'starting' | 'confirming' | 'guessing' | 'reveal';
 export type AffirmationType = 'general' | 'interpersonal';
 
 export type RelationKind =
@@ -157,6 +157,7 @@ export function useGameSocket() {
 
     socket.on('QUESTIONNAIRE_START', () => setPhase('questionnaire'));
     socket.on('QUESTIONNAIRE_PROGRESS', (data) => setQuestionnaireProgress(data));
+    socket.on('STARTING_GAME', () => setPhase('starting'));
 
     socket.on('NEW_TURN', (data: TurnData) => {
       setTurnData(data);
