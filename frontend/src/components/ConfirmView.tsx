@@ -1,9 +1,74 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export default function ConfirmView({ game }: { game: any }) {
   const { turnData, isMyTurn, hasConfirmed } = game;
+  const [preparingDone, setPreparingDone] = useState(false);
+  const [prepareElapsed, setPrepareElapsed] = useState(0);
+
+  const PREPARE_SECONDS = 30; // dale tiempo a la primera generación de Gemini
+
+  // Solo aplica al primer turno de toda la partida
+  const needsPreparing = turnData?.round === 1 && !preparingDone;
+
+  useEffect(() => {
+    if (!needsPreparing) return;
+    setPrepareElapsed(0);
+    const t = setInterval(() => {
+      setPrepareElapsed(prev => {
+        const next = prev + 1;
+        if (next >= PREPARE_SECONDS) {
+          clearInterval(t);
+          setPreparingDone(true);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [needsPreparing]);
+
+  // Si la imagen llegó antes de los 30s, también terminamos preparing
+  useEffect(() => {
+    if (needsPreparing && turnData?.imageBase64) {
+      setPreparingDone(true);
+    }
+  }, [needsPreparing, turnData?.imageBase64]);
 
   if (!turnData) return null;
+
+  // ═══════════ PREPARING (solo round 1) ═══════════
+  if (needsPreparing) {
+    const pct = Math.min(100, (prepareElapsed / PREPARE_SECONDS) * 100);
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6">
+        <img
+          src="/brand/Logotipo_AGUA_O_TEQUILA_SHOTS_TRANSPARENTE.png"
+          alt=""
+          className="w-24 mb-6 liquid-float"
+        />
+        <p className="text-ink-soft text-[11px] uppercase tracking-[0.2em] font-semibold mb-3">
+          Preparando partida
+        </p>
+        <h2 className="text-2xl font-black text-ink mb-2 text-center">
+          Calentando motores…
+        </h2>
+        <p className="text-ink-soft text-sm text-center max-w-xs mb-8 font-medium">
+          Generando la primera escena con la cara de {turnData.currentPlayer}.
+          Esto tarda unos segundos solo la primera vez.
+        </p>
+        <div className="w-full max-w-xs h-2 bg-ink-hint/30 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-water-light via-water to-water-deep transition-all duration-1000 ease-linear"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-ink-faint text-xs mt-3 font-mono">
+          {Math.max(0, PREPARE_SECONDS - prepareElapsed)}s
+        </p>
+      </div>
+    );
+  }
 
   if (isMyTurn) {
     if (hasConfirmed) {
