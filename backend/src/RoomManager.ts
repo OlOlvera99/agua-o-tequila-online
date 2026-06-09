@@ -31,6 +31,13 @@ export class RoomManager {
     return undefined;
   }
 
+  findRoomBySocket(socketId: string): GameRoom | undefined {
+    for (const room of this.rooms.values()) {
+      if (room.players.some(p => p.socketId === socketId)) return room;
+    }
+    return undefined;
+  }
+
   getRoomCount(): number {
     return this.rooms.size;
   }

@@ -61,6 +61,7 @@ export interface PlayerInfo {
   socketId: string;
   isHost: boolean;
   questionnaireReady?: boolean;
+  connected?: boolean;
 }
 
 export interface RoomState {
@@ -112,10 +113,22 @@ export interface PlayerProfile {
   selfieBase64?: string;
 }
 
+// ═══════════ SESSION PERSISTENCE (para reconexión tras lock de pantalla / reload) ═══════════
+
+const SESSION_KEY = 'aot_session_v1';
+
+interface StoredSession { roomId: string; name: string; token: string }
+
+function loadSession(): StoredSession | null {
+  if (typeof window === 'undefined') return null;
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+}
+
 // ═══════════ HOOK ═══════════
 
 export function useGameSocket() {
   const socketRef = useRef<Socket | null>(null);
+  const sessionRef = useRef<StoredSession | null>(null);
   const [connected, setConnected] = useState(false);
   const [mySocketId, setMySocketId] = useState<string>('');
   const [myName, setMyName] = useState<string>('');
@@ -136,16 +149,66 @@ export function useGameSocket() {
   const isMyTurn = turnData?.currentPlayerId === mySocketId;
 
   useEffect(() => {
+    sessionRef.current = loadSession();
+
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
+
+    const saveSession = (rid: string, name: string, token: string) => {
+      sessionRef.current = { roomId: rid, name, token };
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionRef.current)); } catch {}
+    };
+    const clearSession = () => {
+      sessionRef.current = null;
+      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    };
+    // Exponer para los callbacks de create/join (fuera de este efecto)
+    (socket as any).__saveSession = saveSession;
+
+    /** Aplica el snapshot del server tras una reconexión y repinta la pantalla correcta. */
+    const applySnapshot = (snap: any, name: string, rid: string) => {
+      if (!snap) return;
+      setMyName(name);
+      setRoomId(rid);
+      setRoomState(snap.lobby || null);
+      setScoreboard(snap.scoreboard || []);
+      if (snap.turn) setTurnData(snap.turn);
+      if (snap.guessCount) setGuessCount(snap.guessCount);
+      if (snap.reveal) setRevealData(snap.reveal);
+      setHasSubmittedGuess(snap.myGuess != null);
+      setHasConfirmed(snap.phase === 'guessing' || snap.phase === 'reveal');
+      setIsGenerating(false);
+      const ph = snap.phase as string;
+      if (ph === 'questionnaire') setPhase('questionnaire');
+      else if (ph === 'confirming') setPhase('confirming');
+      else if (ph === 'guessing') setPhase('guessing');
+      else if (ph === 'reveal') setPhase('reveal');
+      else setPhase('lobby');
+    };
+    (socket as any).__applySnapshot = applySnapshot;
 
     socket.on('connect', () => {
       setConnected(true);
       setMySocketId(socket.id || '');
+
+      // Auto-resume: si hay sesión guardada (reload, lock de pantalla, app switch),
+      // re-engancharse a la sala sin perder el lugar en el juego.
+      const s = sessionRef.current;
+      if (s?.roomId && s?.name) {
+        socket.emit('RECONNECT_ROOM', { roomId: s.roomId, playerName: s.name, playerToken: s.token }, (res: any) => {
+          if (res?.success) {
+            if (res.playerToken) saveSession(s.roomId, s.name, res.playerToken);
+            applySnapshot(res.snapshot, s.name, s.roomId);
+          } else {
+            clearSession(); // sala muerta o token inválido — empezar de cero
+          }
+        });
+      }
     });
     socket.on('disconnect', () => setConnected(false));
 
@@ -194,11 +257,13 @@ export function useGameSocket() {
 
   const createRoom = useCallback(async (playerName: string, settings: any) => {
     return new Promise<string>((resolve, reject) => {
-      socketRef.current?.emit('CREATE_ROOM', { playerName, settings }, (res: any) => {
+      const sock: any = socketRef.current;
+      sock?.emit('CREATE_ROOM', { playerName, settings }, (res: any) => {
         if (res.roomId) {
           setMyName(playerName);
           setRoomId(res.roomId);
           setPhase('lobby');
+          sock.__saveSession?.(res.roomId, playerName, res.playerToken || '');
           resolve(res.roomId);
         } else reject(res.error);
       });
@@ -207,11 +272,19 @@ export function useGameSocket() {
 
   const joinRoom = useCallback(async (targetRoomId: string, playerName: string) => {
     return new Promise<void>((resolve, reject) => {
-      socketRef.current?.emit('JOIN_ROOM', { roomId: targetRoomId, playerName }, (res: any) => {
+      const sock: any = socketRef.current;
+      const rid = targetRoomId.toUpperCase();
+      sock?.emit('JOIN_ROOM', { roomId: rid, playerName }, (res: any) => {
         if (res.success) {
           setMyName(playerName);
-          setRoomId(targetRoomId.toUpperCase());
-          setPhase('lobby');
+          setRoomId(rid);
+          sock.__saveSession?.(rid, playerName, res.playerToken || '');
+          if (res.snapshot) {
+            // Rejoin a partida en curso (mismo nombre) — restaurar pantalla
+            sock.__applySnapshot?.(res.snapshot, playerName, rid);
+          } else {
+            setPhase('lobby');
+          }
           resolve();
         } else reject(res.error);
       });

@@ -1,7 +1,8 @@
 import { customAlphabet } from 'nanoid';
 import { AFFIRMATIONS } from './affirmations';
 import {
-  getPoolForPair, fillTemplate, GROUP_VIBE_CONFIG, ViralAffirmation
+  getPoolForPair, fillTemplate, GROUP_VIBE_CONFIG, ViralAffirmation,
+  getYoRoleForPair, filterByOrientation,
 } from './viralAffirmations';
 import type {
   Player, GameSettings, GamePhase, RoundResults, ScoreEntry,
@@ -9,6 +10,7 @@ import type {
 } from './types';
 
 const generateId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 10);
+const generateToken = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 24);
 
 /**
  * Un turno preparado pero todavía no jugado.
@@ -25,6 +27,7 @@ export interface PendingTurn {
   relationType: RelationType;
   imageBase64?: string;
   imageGenStarted: boolean;
+  imageGenAttempts?: number; // para retry con límite tras errores transitorios
 }
 
 export class GameRoom {
@@ -45,6 +48,10 @@ export class GameRoom {
   currentRelationType: RelationType = 'amigos_generico';
   currentOtherPlayerName: string = '';
   currentImageBase64: string = '';
+  /** Referencia al PendingTurn aplicado como current (para image-gen tardía/regeneración). */
+  currentTurnRef: PendingTurn | null = null;
+  /** Último payload de REVEAL — para restaurar estado al reconectarse en fase reveal. */
+  lastReveal: any = null;
 
   // ═══════════ COLA DE TURNOS PRE-COMPUTADOS ═══════════
   // Permite pre-generar imágenes mientras se juega.
@@ -74,8 +81,8 @@ export class GameRoom {
 
   // ═══════════ JUGADORES ═══════════
 
-  addPlayer(socketId: string, name: string, isHost = false) {
-    this.players.push({
+  addPlayer(socketId: string, name: string, isHost = false): Player {
+    const player: Player = {
       socketId,
       name,
       isHost,
@@ -84,8 +91,12 @@ export class GameRoom {
       currentGuess: null,
       profile: null,
       questionnaireReady: false,
-    });
+      connected: true,
+      token: generateToken(),
+    };
+    this.players.push(player);
     this.touch();
+    return player;
   }
 
   removePlayer(socketId: string) {
@@ -95,6 +106,46 @@ export class GameRoom {
       this.players[0].isHost = true;
     }
     this.touch();
+  }
+
+  /** Marca un jugador como desconectado SIN sacarlo del juego (puede volver). */
+  markDisconnected(socketId: string): Player | undefined {
+    const p = this.players.find(pl => pl.socketId === socketId);
+    if (p) {
+      p.connected = false;
+      console.log(`🔌💤 ${p.name} desconectado (puede reconectarse)`);
+    }
+    this.touch();
+    return p;
+  }
+
+  /**
+   * Re-asocia un jugador existente a un socket nuevo (reconexión).
+   * - Si el jugador sigue marcado como conectado, exige token correcto
+   *   (protege contra suplantación de nombre).
+   * - Remapea hostId y los sockets de la cola de turnos.
+   */
+  reattachPlayer(name: string, token: string | null | undefined, newSocketId: string): Player | null {
+    const p = this.players.find(pl => pl.name === name);
+    if (!p) return null;
+    if (p.connected && (!token || token !== p.token)) return null;
+    if (token && token !== p.token) return null;
+
+    const oldId = p.socketId;
+    p.socketId = newSocketId;
+    p.connected = true;
+    if (this.hostId === oldId) this.hostId = newSocketId;
+    this.upcomingTurns.forEach(t => { if (t.yoSocketId === oldId) t.yoSocketId = newSocketId; });
+    if (this.currentTurnRef && this.currentTurnRef.yoSocketId === oldId) {
+      this.currentTurnRef.yoSocketId = newSocketId;
+    }
+    console.log(`🔌✅ ${p.name} reconectado (${oldId.slice(0, 6)}… → ${newSocketId.slice(0, 6)}…)`);
+    this.touch();
+    return p;
+  }
+
+  connectedPlayers(): Player[] {
+    return this.players.filter(p => p.connected !== false);
   }
 
   updateSettings(settings: Partial<GameSettings>) {
@@ -153,7 +204,12 @@ export class GameRoom {
 
   /** Construye un PendingTurn sin mutar currentPlayerIndex/round. */
   private buildTurnForPlayer(roundNum: number, yoIdx: number): PendingTurn | null {
-    const yoPlayer = this.players[yoIdx];
+    // Si el jugador en yoIdx está desconectado, avanzar al siguiente conectado
+    let yoPlayer: Player | undefined;
+    for (let i = 0; i < this.players.length; i++) {
+      const candidate = this.players[(yoIdx + i) % this.players.length];
+      if (candidate && candidate.connected !== false) { yoPlayer = candidate; break; }
+    }
     if (!yoPlayer) return null;
     const otro = this.pickOtroFor(yoPlayer);
 
@@ -172,7 +228,19 @@ export class GameRoom {
       this.settings.level, this.settings.groupVibe,
     );
 
-    const available = pool.filter(a => !this.usedTemplates.has(a.text));
+    // ── Filtro de orientación para pools asimétricos (madre/hijo, suegra/nuera…) ──
+    // Evita que a la mamá le toque un template escrito desde la perspectiva del hijo.
+    const yoRole = getYoRoleForPair(relationType, kindA, kindB);
+    const oriented = filterByOrientation(pool, yoRole);
+
+    let available = oriented.filter(a => !this.usedTemplates.has(a.text));
+    if (available.length === 0 && oriented.length > 0) {
+      // ── Reciclar pool curado en vez de caer a genéricas (que no tienen imagen) ──
+      oriented.forEach(a => this.usedTemplates.delete(a.text));
+      available = oriented.filter(a => a.text !== this.currentAffirmationTemplate);
+      if (available.length === 0) available = oriented;
+      console.log(`♻️  Pool ${relationType} reciclado (${oriented.length} templates, yoRole=${yoRole ?? '—'})`);
+    }
     if (available.length === 0) {
       return this.buildFallbackTurn(roundNum, yoPlayer, otro);
     }
@@ -224,7 +292,8 @@ export class GameRoom {
    * Preferencia: alguien con relación específica reportada > cualquier otro.
    */
   private pickOtroFor(currentPlayer: Player): Player | undefined {
-    const others = this.players.filter(p => p.socketId !== currentPlayer.socketId);
+    // Solo jugadores conectados — no construir afirmaciones sobre alguien ausente
+    const others = this.players.filter(p => p.socketId !== currentPlayer.socketId && p.connected !== false);
     if (others.length === 0) return undefined;
     const rels = currentPlayer.profile?.relationships || {};
     const withSpecificRel = others.filter(p => {
@@ -272,14 +341,28 @@ export class GameRoom {
     this.currentTruth = null;
     this.phase = 'confirming';
 
-    // Consumir el siguiente PendingTurn de la cola
-    const next = this.upcomingTurns.shift();
+    // Consumir el siguiente PendingTurn VÁLIDO de la cola.
+    // Turnos cuyo {yo} u {otro} está desconectado se descartan (ya no aplican).
+    let next: PendingTurn | undefined;
+    while ((next = this.upcomingTurns.shift())) {
+      const yoP = this.players.find(pl => pl.socketId === next!.yoSocketId);
+      const otroOk = !next.otroName || this.players.some(
+        pl => pl.name === next!.otroName && pl.connected !== false
+      );
+      if (yoP && yoP.connected !== false && otroOk) break;
+      console.log(`⏭️  Turno descartado (jugador ausente): R${next.round} ${next.yoName}→${next.otroName}`);
+      next = undefined;
+    }
+
     if (next) {
       this.applyPendingTurnAsCurrent(next);
     } else {
-      // Fallback (cola vacía): construir uno fresco
+      // Fallback (cola vacía): construir uno fresco para el siguiente conectado
       this.round++;
-      this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+      for (let i = 1; i <= this.players.length; i++) {
+        const idx = (this.currentPlayerIndex + i) % this.players.length;
+        if (this.players[idx]?.connected !== false) { this.currentPlayerIndex = idx; break; }
+      }
       const fresh = this.buildTurnForPlayer(this.round, this.currentPlayerIndex);
       if (fresh) this.applyPendingTurnAsCurrent(fresh);
     }
@@ -293,9 +376,10 @@ export class GameRoom {
     this.round = t.round;
     this.currentPlayerIndex = this.players.findIndex(p => p.socketId === t.yoSocketId);
     if (this.currentPlayerIndex === -1) {
-      // Player desconectado — usar índice 0 como fallback
-      this.currentPlayerIndex = 0;
+      // Defensivo (startNextTurn ya valida): primer conectado disponible
+      this.currentPlayerIndex = Math.max(0, this.players.findIndex(p => p.connected !== false));
     }
+    this.currentTurnRef = t;
     this.currentAffirmation = t.affirmation;
     this.currentAffirmationTemplate = t.template;
     this.currentAffirmationType = t.type;
@@ -306,11 +390,11 @@ export class GameRoom {
   }
 
   getCurrentPlayerId(): string {
-    return this.players[this.currentPlayerIndex].socketId;
+    return this.players[this.currentPlayerIndex]?.socketId || '';
   }
 
   getCurrentPlayerName(): string {
-    return this.players[this.currentPlayerIndex].name;
+    return this.players[this.currentPlayerIndex]?.name || '';
   }
 
   getCurrentPlayer(): Player {
@@ -347,7 +431,10 @@ export class GameRoom {
   }
 
   getGuessStatus(): { voted: number; total: number } {
-    const voters = this.players.filter(p => p.socketId !== this.getCurrentPlayerId());
+    // Solo conectados — si alguien se cae a media ronda, la votación no se atora esperándolo
+    const voters = this.players.filter(
+      p => p.socketId !== this.getCurrentPlayerId() && p.connected !== false
+    );
     const voted = voters.filter(p => p.currentGuess !== null).length;
     return { voted, total: voters.length };
   }
@@ -366,7 +453,9 @@ export class GameRoom {
 
   calculateResults(): RoundResults {
     const truthAnswer = this.currentTruth ? 'verdad' : 'mentira';
-    const voters = this.players.filter(p => p.socketId !== this.getCurrentPlayerId());
+    const voters = this.players.filter(
+      p => p.socketId !== this.getCurrentPlayerId() && p.connected !== false
+    );
     const currentPlayer = this.players[this.currentPlayerIndex];
     const wrongAnswer: 'verdad' | 'mentira' = truthAnswer === 'verdad' ? 'mentira' : 'verdad';
 
@@ -436,11 +525,38 @@ export class GameRoom {
         socketId: p.socketId,
         isHost: p.isHost,
         questionnaireReady: p.questionnaireReady,
+        connected: p.connected !== false,
       })),
       settings: this.settings,
       phase: this.phase,
       playerCount: this.players.length,
       questionnaireProgress: this.getQuestionnaireProgress(),
+    };
+  }
+
+  /**
+   * Snapshot completo del estado del juego para reconexiones —
+   * suficiente para que el cliente repinte la pantalla correcta.
+   */
+  getSnapshotFor(socketId: string) {
+    const me = this.players.find(p => p.socketId === socketId);
+    const hasTurn = this.phase === 'confirming' || this.phase === 'guessing' || this.phase === 'reveal';
+    return {
+      lobby: this.getLobbyState(),
+      phase: this.phase,
+      turn: hasTurn && this.currentAffirmation ? {
+        currentPlayer: this.getCurrentPlayerName(),
+        currentPlayerId: this.getCurrentPlayerId(),
+        affirmation: this.currentAffirmation,
+        round: this.round,
+        phase: this.phase,
+        type: this.currentAffirmationType,
+        imageBase64: this.currentImageBase64 || undefined,
+      } : null,
+      guessCount: this.phase === 'guessing' ? this.getGuessStatus() : null,
+      scoreboard: this.getScoreboard(),
+      reveal: this.phase === 'reveal' ? this.lastReveal : null,
+      myGuess: me?.currentGuess ?? null,
     };
   }
 

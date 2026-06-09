@@ -74,33 +74,28 @@ export async function generateTurnImage(
     });
   }
 
-  try {
-    const t0 = Date.now();
-    const response = await client.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [{ role: 'user', parts }],
-      config: {
-        responseModalities: ['IMAGE'],
-        imageConfig: { aspectRatio: '1:1' },
-      },
-    });
+  // Los errores de API se propagan al caller para que pueda reintentar
+  // (antes se tragaban aquí y el turno quedaba sin imagen para siempre).
+  const t0 = Date.now();
+  const response = await client.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [{ role: 'user', parts }],
+    config: {
+      responseModalities: ['IMAGE'],
+      imageConfig: { aspectRatio: '1:1' },
+    },
+  });
 
-    const candidates = (response as any).candidates;
-    if (!candidates?.[0]?.content?.parts) {
-      console.error('🖼️  Gemini response sin parts');
-      return null;
-    }
-    for (const part of candidates[0].content.parts) {
-      if (part.inlineData?.data) {
-        const dt = Math.round((Date.now() - t0) / 100) / 10;
-        console.log(`🖼️  Imagen generada (${dt}s, ${Math.round(part.inlineData.data.length / 1024)}KB)`);
-        return part.inlineData.data;
-      }
-    }
-    console.error('🖼️  Gemini response sin imagen');
-    return null;
-  } catch (err: any) {
-    console.error('🖼️  Error generando imagen:', err.message || err);
-    return null;
+  const candidates = (response as any).candidates;
+  if (!candidates?.[0]?.content?.parts) {
+    throw new Error('Gemini response sin parts');
   }
+  for (const part of candidates[0].content.parts) {
+    if (part.inlineData?.data) {
+      const dt = Math.round((Date.now() - t0) / 100) / 10;
+      console.log(`🖼️  Imagen generada (${dt}s, ${Math.round(part.inlineData.data.length / 1024)}KB)`);
+      return part.inlineData.data;
+    }
+  }
+  throw new Error('Gemini response sin imagen');
 }

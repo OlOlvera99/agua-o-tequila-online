@@ -97,20 +97,33 @@ function checkRate(socketId: string, max: number, windowMs: number): boolean {
 }
 
 // ═══════════ IMAGE PIPELINE ═══════════
+const MAX_IMAGE_ATTEMPTS = 3;
+const IMAGE_DISPATCH_STAGGER_MS = 1500;
+
 /**
- * Para cada PendingTurn que no haya iniciado generación, dispara gen en paralelo.
- * Cuando termina, guarda el resultado en el turn y emite IMAGE_READY si ese turn
- * coincide con el round actual.
+ * Dispara generación de imagen para el turno ACTUAL (si le falta) y los de la cola.
+ * - Errores transitorios de Gemini reintentan hasta MAX_IMAGE_ATTEMPTS (en el
+ *   próximo kickoff, que ocurre en cada cambio de turno).
+ * - Dispatches escalonados para no reventar rate limits con ráfagas paralelas.
  */
 function kickoffPendingImageGen(room: any, roomId: string) {
   if (!isImageGenAvailable()) return;
-  for (const turn of room.upcomingTurns) {
+  const turns: any[] = [
+    ...(room.currentTurnRef && !room.currentTurnRef.imageGenStarted ? [room.currentTurnRef] : []),
+    ...room.upcomingTurns,
+  ];
+  let stagger = 0;
+  for (const turn of turns) {
     if (turn.imageGenStarted) continue;
-    room.markImageGenStarted(turn.round);
     const yoPlayer = room.players.find((p: any) => p.socketId === turn.yoSocketId);
-    const otroPlayer = room.players.find((p: any) => p.name === turn.otroName);
-    if (!yoPlayer?.profile?.selfieBase64) continue;
+    if (!yoPlayer?.profile?.selfieBase64) {
+      turn.imageGenStarted = true; // sin selfie no habrá imagen nunca — skip permanente
+      continue;
+    }
+    turn.imageGenStarted = true;
+    turn.imageGenAttempts = (turn.imageGenAttempts || 0) + 1;
 
+    const otroPlayer = room.players.find((p: any) => p.name === turn.otroName);
     const yoArg = {
       name: yoPlayer.name,
       gender: yoPlayer.profile.gender,
@@ -128,19 +141,28 @@ function kickoffPendingImageGen(room: any, roomId: string) {
 
     const roundCaptured = turn.round;
     const templateCaptured = turn.template;
-    generateTurnImage(turn.relationType, turn.template, yoArg, otroArg)
-      .then((imageBase64: string | null) => {
-        if (!imageBase64) return;
-        // Guardar en el turn (puede estar en cola o ser el current)
-        room.setImageForRound(roundCaptured, imageBase64);
-        // Si es el round actual EN VIVO, emitir IMAGE_READY al room
-        if (room.round === roundCaptured) {
-          io.to(roomId).emit('IMAGE_READY', { round: roundCaptured, imageBase64 });
-        }
-      })
-      .catch((err: any) => {
-        console.error(`Image gen failed for R${roundCaptured} (${templateCaptured.slice(0, 40)}…):`, err?.message || err);
-      });
+    const delay = stagger;
+    stagger += IMAGE_DISPATCH_STAGGER_MS;
+
+    setTimeout(() => {
+      generateTurnImage(turn.relationType, turn.template, yoArg, otroArg)
+        .then((imageBase64: string | null) => {
+          if (!imageBase64) return; // skip permanente (sin selfie / sin cliente)
+          room.setImageForRound(roundCaptured, imageBase64);
+          if (room.round === roundCaptured) {
+            io.to(roomId).emit('IMAGE_READY', { round: roundCaptured, imageBase64 });
+          }
+        })
+        .catch((err: any) => {
+          console.error(
+            `🖼️  Gen falló R${roundCaptured} intento ${turn.imageGenAttempts}/${MAX_IMAGE_ATTEMPTS} (${templateCaptured.slice(0, 40)}…):`,
+            err?.message || err,
+          );
+          if ((turn.imageGenAttempts || 0) < MAX_IMAGE_ATTEMPTS) {
+            turn.imageGenStarted = false; // se reintenta en el próximo kickoff
+          }
+        });
+    }, delay);
   }
 }
 
@@ -171,7 +193,7 @@ io.on('connection', (socket) => {
     if (!name) return callback({ roomId: '' } as any);
     const room = roomManager.createRoom(socket.id, name, settings || {});
     socket.join(room.id);
-    callback({ roomId: room.id });
+    callback({ roomId: room.id, playerToken: room.players[0]?.token });
     io.to(room.id).emit('ROOM_UPDATE', room.getLobbyState());
   });
 
@@ -184,13 +206,40 @@ io.on('connection', (socket) => {
     const id = cleanRoomId.toUpperCase();
     const room = roomManager.getRoom(id);
     if (!room) return callback({ error: 'Sala no encontrada' });
+
+    // Reconexión por nombre: si el jugador existe y está desconectado, re-engancharlo
+    const existing = room.players.find(p => p.name === name);
+    if (existing && existing.connected === false) {
+      const player = room.reattachPlayer(name, null, socket.id);
+      if (player) {
+        socket.join(id);
+        callback({ success: true, playerToken: player.token, snapshot: room.getSnapshotFor(socket.id) });
+        io.to(id).emit('ROOM_UPDATE', room.getLobbyState());
+        return;
+      }
+    }
+
     if (room.phase !== 'lobby') return callback({ error: 'Juego ya iniciado' });
     if (room.players.length >= 12) return callback({ error: 'Sala llena (máx 12)' });
     if (room.players.some(p => p.name === name)) return callback({ error: 'Nombre en uso' });
-    room.addPlayer(socket.id, name);
+    const player = room.addPlayer(socket.id, name);
     socket.join(id);
-    callback({ success: true });
+    callback({ success: true, playerToken: player.token });
     io.to(id).emit('ROOM_UPDATE', room.getLobbyState());
+  });
+
+  socket.on('RECONNECT_ROOM', ({ roomId, playerName, playerToken }, callback) => {
+    if (!checkRate(socket.id, 15, 60_000)) return callback({ error: 'Demasiados intentos' });
+    const cleanRoomId = sanitizeStr(roomId, LIMITS.roomId);
+    const name = sanitizeStr(playerName, LIMITS.playerName);
+    if (!cleanRoomId || !name) return callback({ error: 'Datos inválidos' });
+    const room = roomManager.getRoom(cleanRoomId.toUpperCase());
+    if (!room) return callback({ error: 'Sala no encontrada' });
+    const player = room.reattachPlayer(name, playerToken, socket.id);
+    if (!player) return callback({ error: 'No se pudo reconectar' });
+    socket.join(room.id);
+    callback({ success: true, playerToken: player.token, snapshot: room.getSnapshotFor(socket.id) });
+    io.to(room.id).emit('ROOM_UPDATE', room.getLobbyState());
   });
 
   socket.on('UPDATE_SETTINGS', ({ roomId, settings }) => {
@@ -310,7 +359,7 @@ io.on('connection', (socket) => {
   function doReveal(room: any, roomId: string) {
     const results = room.calculateResults();
     room.phase = 'reveal';
-    io.to(roomId).emit('REVEAL', {
+    const payload = {
       affirmation: room.currentAffirmation,
       truth: room.currentTruth!,
       guesses: results.guesses,
@@ -318,19 +367,30 @@ io.on('connection', (socket) => {
       reason: results.reason,
       type: room.currentAffirmationType,
       imageBase64: room.currentImageBase64 || undefined,
-    });
+    };
+    room.lastReveal = payload; // para snapshot de reconexión
+    io.to(roomId).emit('REVEAL', payload);
     io.to(roomId).emit('SCOREBOARD', { scores: room.getScoreboard() });
+  }
+
+  /** Host normal, o cualquier conectado si el host está desconectado (anti-atasco). */
+  function canAdvance(room: any, socketId: string): boolean {
+    if (room.hostId === socketId) return true;
+    const hostPlayer = room.players.find((p: any) => p.socketId === room.hostId);
+    const hostGone = !hostPlayer || hostPlayer.connected === false;
+    const requester = room.players.find((p: any) => p.socketId === socketId);
+    return hostGone && !!requester && requester.connected !== false;
   }
 
   socket.on('NEXT_TURN', ({ roomId }) => {
     const room = roomManager.getRoom(roomId);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || !canAdvance(room, socket.id)) return;
     startTurn(room, roomId);
   });
 
   socket.on('REGENERATE_AFFIRMATION', ({ roomId }) => {
     const room = roomManager.getRoom(roomId);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || !canAdvance(room, socket.id)) return;
     room.regenerateAffirmation();
     io.to(roomId).emit('NEW_TURN', {
       currentPlayer: room.getCurrentPlayerName(),
@@ -341,18 +401,34 @@ io.on('connection', (socket) => {
       type: room.currentAffirmationType,
       imageBase64: room.currentImageBase64 || undefined,
     });
-    // Disparar gen para la nueva afirmación si tiene selfie
-    // (la generación corre como turno virtual round === room.round)
-    // El trigger lo hacemos creando un PendingTurn virtual o usando la lógica existente
-    // — por simplicidad: emit con la imagen vacía y el cliente la espera
+    // La afirmación regenerada entra como currentTurnRef con imageGenStarted=false
+    // → kickoff la recoge y el cliente la recibe vía IMAGE_READY.
+    kickoffPendingImageGen(room, roomId);
   });
 
   socket.on('disconnect', () => {
     console.log(`❌ Desconectado: ${socket.id}`);
-    const room = roomManager.removePlayer(socket.id);
-    if (room) {
+    const room = roomManager.findRoomBySocket(socket.id);
+    if (!room) return;
+
+    if (room.phase === 'lobby') {
+      // En lobby sí se elimina de inmediato (no hay estado de juego que preservar)
+      roomManager.removePlayer(socket.id);
       io.to(room.id).emit('ROOM_UPDATE', room.getLobbyState());
       if (room.players.length === 0) roomManager.deleteRoom(room.id);
+      return;
+    }
+
+    // Mid-game: marcar como desconectado con derecho a reconexión.
+    room.markDisconnected(socket.id);
+    io.to(room.id).emit('ROOM_UPDATE', room.getLobbyState());
+
+    // Si estaban votando y solo faltaba este jugador → revelar con los conectados
+    if (room.phase === 'guessing') {
+      const status = room.getGuessStatus();
+      if (status.total > 0 && status.voted === status.total) {
+        doReveal(room, room.id);
+      }
     }
   });
 });

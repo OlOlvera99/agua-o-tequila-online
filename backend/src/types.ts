@@ -9,6 +9,10 @@ export interface Player {
   currentGuess: 'verdad' | 'mentira' | null;
   profile: PlayerProfile | null;
   questionnaireReady: boolean;
+  /** false cuando el socket se cayó mid-game; el jugador puede reconectarse. */
+  connected: boolean;
+  /** Token de sesión para reconexión segura (anti suplantación de nombre). */
+  token: string;
 }
 
 // ═══════════ CUESTIONARIO ═══════════
@@ -119,8 +123,9 @@ export interface ScoreEntry {
 // ═══════════ EVENTOS CLIENTE → SERVIDOR ═══════════
 
 export interface ClientEvents {
-  CREATE_ROOM: (data: { playerName: string; settings: Partial<GameSettings> }, cb: (res: { roomId: string }) => void) => void;
-  JOIN_ROOM: (data: { roomId: string; playerName: string }, cb: (res: { success?: boolean; error?: string }) => void) => void;
+  CREATE_ROOM: (data: { playerName: string; settings: Partial<GameSettings> }, cb: (res: { roomId: string; playerToken?: string }) => void) => void;
+  JOIN_ROOM: (data: { roomId: string; playerName: string }, cb: (res: { success?: boolean; error?: string; playerToken?: string; snapshot?: any }) => void) => void;
+  RECONNECT_ROOM: (data: { roomId: string; playerName: string; playerToken?: string }, cb: (res: { success?: boolean; error?: string; playerToken?: string; snapshot?: any }) => void) => void;
   UPDATE_SETTINGS: (data: { roomId: string; settings: Partial<GameSettings> }) => void;
   SUBMIT_PROFILE: (data: { roomId: string; profile: PlayerProfile }) => void;
   START_GAME: (data: { roomId: string }) => void;

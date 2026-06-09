@@ -14,6 +14,12 @@ import scenePromptsData from './scenePrompts.json';
 export interface ViralAffirmation {
   text: string;
   level: 'suave' | 'picante' | 'extrema' | 'all';
+  /**
+   * Para pools asimétricos (madre_hijo, padre_hija, suegra_nuera, suegro_yerno…):
+   * el rol que DEBE tener el jugador {yo} para que el template tenga sentido.
+   * Si está ausente, el template funciona en ambas direcciones.
+   */
+  yoRole?: string;
 }
 
 // ═══════════ SCENE PROMPTS (para generación de imágenes) ═══════════
@@ -284,87 +290,87 @@ export const VIRAL_AFFIRMATIONS: Record<RelationType, ViralAffirmation[]> = {
   madre_hija: [],
   // Pool de "Hablemos al Chile 8 de junio" — hijo + mamá hablan
   madre_hijo: [
-    // — Hijo habla —
-    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
-    { text: 'A {yo} le ha atraído alguna de las amigas de {otro}', level: 'extrema' },
-    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema' },
-    { text: '{yo} le ha robado dinero a {otro}', level: 'picante' },
-    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema' },
-    { text: 'Si {yo} tiene un problema, iría primero con su papá que con {otro}', level: 'picante' },
+    // — Hijo habla ({yo} = hijo) —
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema', yoRole: 'hijo' },
+    { text: 'A {yo} le ha atraído alguna de las amigas de {otro}', level: 'extrema', yoRole: 'hijo' },
+    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema', yoRole: 'hijo' },
+    { text: '{yo} le ha robado dinero a {otro}', level: 'picante', yoRole: 'hijo' },
+    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema', yoRole: 'hijo' },
+    { text: 'Si {yo} tiene un problema, iría primero con su papá que con {otro}', level: 'picante', yoRole: 'hijo' },
     { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
-    // — Mamá habla —
-    { text: '{otro} es el hijo favorito de {yo}', level: 'picante' },
-    { text: '{yo} recuerda la noche en que {otro} fue concebido', level: 'extrema' },
-    { text: 'Hay algo del papá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante' },
-    { text: '{yo} extraña a la ex novia de {otro}', level: 'picante' },
-    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante' },
-    { text: '{otro} fue planeado', level: 'picante' },
-    { text: '{yo} está orgullosa de {otro}', level: 'suave' },
+    // — Mamá habla ({yo} = madre) —
+    { text: '{otro} es el hijo favorito de {yo}', level: 'picante', yoRole: 'madre' },
+    { text: '{yo} recuerda la noche en que {otro} fue concebido', level: 'extrema', yoRole: 'madre' },
+    { text: 'Hay algo del papá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante', yoRole: 'madre' },
+    { text: '{yo} extraña a la ex novia de {otro}', level: 'picante', yoRole: 'madre' },
+    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante', yoRole: 'madre' },
+    { text: '{otro} fue planeado', level: 'picante', yoRole: 'madre' },
+    { text: '{yo} está orgullosa de {otro}', level: 'suave', yoRole: 'madre' },
   ],
   padre_hijo: [],
   // Pool de "Cuestionario HAC Papá e Hija" — hija + padre hablan
   padre_hija: [
-    // — Hija habla —
-    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
-    { text: 'A {yo} le ha atraído alguno de los amigos de {otro}', level: 'extrema' },
-    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema' },
-    { text: '{yo} le ha robado dinero a {otro}', level: 'picante' },
-    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema' },
-    { text: 'Si {yo} tiene un problema, iría primero con su mamá que con {otro}', level: 'picante' },
+    // — Hija habla ({yo} = hija) —
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema', yoRole: 'hija' },
+    { text: 'A {yo} le ha atraído alguno de los amigos de {otro}', level: 'extrema', yoRole: 'hija' },
+    { text: '{yo} ha tenido más de 3 parejas sexuales', level: 'extrema', yoRole: 'hija' },
+    { text: '{yo} le ha robado dinero a {otro}', level: 'picante', yoRole: 'hija' },
+    { text: '{yo} ha cachado a sus papás teniendo relaciones', level: 'extrema', yoRole: 'hija' },
+    { text: 'Si {yo} tiene un problema, iría primero con su mamá que con {otro}', level: 'picante', yoRole: 'hija' },
     { text: '{yo} y {otro} tienen una buena relación', level: 'suave' },
-    // — Padre habla —
-    { text: '{otro} es la hija favorita de {yo}', level: 'picante' },
-    { text: '{yo} recuerda la noche en que {otro} fue concebida', level: 'extrema' },
-    { text: 'Hay algo de la mamá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante' },
-    { text: '{yo} extraña al ex novio de {otro}', level: 'picante' },
-    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante' },
-    { text: '{otro} fue planeada', level: 'picante' },
-    { text: '{yo} está orgulloso de {otro}', level: 'suave' },
+    // — Padre habla ({yo} = padre) —
+    { text: '{otro} es la hija favorita de {yo}', level: 'picante', yoRole: 'padre' },
+    { text: '{yo} recuerda la noche en que {otro} fue concebida', level: 'extrema', yoRole: 'padre' },
+    { text: 'Hay algo de la mamá de {otro} que a {yo} no le gusta y {otro} también lo hace', level: 'picante', yoRole: 'padre' },
+    { text: '{yo} extraña al ex novio de {otro}', level: 'picante', yoRole: 'padre' },
+    { text: '{yo} alguna vez ha dudado de la sexualidad de {otro}', level: 'picante', yoRole: 'padre' },
+    { text: '{otro} fue planeada', level: 'picante', yoRole: 'padre' },
+    { text: '{yo} está orgulloso de {otro}', level: 'suave', yoRole: 'padre' },
   ],
 
   // ═══════════ FAMILIA POLÍTICA ═══════════
   // Pool de "AoT Julio 2025" + "Cuestionario AoT SUEGRA - NUERA"
   suegra_nuera: [
-    // — Suegra habla —
+    // — Suegra habla ({yo} = suegra) —
     { text: '{yo} cree que las parejas deberían vivir juntas antes de casarse', level: 'suave' },
     { text: 'Alguna vez {yo} se ha puesto celosa de {otro}', level: 'picante' },
     { text: '{yo} es más guapa que {otro}', level: 'all' },
-    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante' },
-    { text: 'El hijo de {yo} anda con {otro} porque se parece a {yo}', level: 'picante' },
+    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante', yoRole: 'suegra' },
+    { text: 'El hijo de {yo} anda con {otro} porque se parece a {yo}', level: 'picante', yoRole: 'suegra' },
     { text: '{yo} cree que el hombre siempre debería ser proveedor', level: 'picante' },
     { text: '{yo} tiene mejor sazón que {otro}', level: 'picante' },
-    { text: 'Si el hijo de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema' },
-    // — Nuera habla —
-    { text: 'Si {yo} se embaraza hoy, abortaría', level: 'extrema' },
-    { text: 'Si {yo} hubiera conocido al esposo de {otro} a la edad de su hijo, serían novios', level: 'extrema' },
-    { text: '{yo} le pondría a su hija el nombre de {otro}', level: 'suave' },
-    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'Si el hijo de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema', yoRole: 'suegra' },
+    // — Nuera habla ({yo} = nuera) —
+    { text: 'Si {yo} se embaraza hoy, abortaría', level: 'extrema', yoRole: 'nuera' },
+    { text: 'Si {yo} hubiera conocido al esposo de {otro} a la edad de su hijo, serían novios', level: 'extrema', yoRole: 'nuera' },
+    { text: '{yo} le pondría a su hija el nombre de {otro}', level: 'suave', yoRole: 'nuera' },
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema', yoRole: 'nuera' },
     { text: 'Si {yo} y {otro} fueran de la misma edad, serían amigas', level: 'suave' },
     { text: '{yo} ha probado más drogas que {otro}', level: 'picante' },
-    { text: 'Si el novio de {yo} pudiera salvar la vida de una de las dos, salvaría a {yo}', level: 'picante' },
-    { text: '{yo} renunciaría a sus sueños por ser mamá de tiempo completo', level: 'picante' },
+    { text: 'Si el novio de {yo} pudiera salvar la vida de una de las dos, salvaría a {yo}', level: 'picante', yoRole: 'nuera' },
+    { text: '{yo} renunciaría a sus sueños por ser mamá de tiempo completo', level: 'picante', yoRole: 'nuera' },
   ],
   // Pool de "AoT Julio 2025" + "Cuestionario AoT SUEGRO - YERNO"
   suegro_yerno: [
-    // — Suegro habla —
+    // — Suegro habla ({yo} = suegro) —
     { text: '{yo} es más borracho que {otro}', level: 'picante' },
     { text: '{yo} es más probable a ser gay que {otro}', level: 'extrema' },
     { text: '{yo} es más guapo que {otro}', level: 'all' },
-    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante' },
-    { text: 'La hija de {yo} anda con {otro} porque se parece a {yo}', level: 'picante' },
+    { text: 'Si el nieto de {yo} fuera gay, lo aceptaría', level: 'picante', yoRole: 'suegro' },
+    { text: 'La hija de {yo} anda con {otro} porque se parece a {yo}', level: 'picante', yoRole: 'suegro' },
     { text: '{yo} cree que el hombre siempre debería ser proveedor', level: 'picante' },
     { text: 'Si {yo} y {otro} se agarran a golpes, {yo} ganaría', level: 'all' },
-    { text: 'Si hoy {otro} le pide a {yo} la mano de su hija, {yo} aceptaría', level: 'picante' },
-    { text: 'Si la hija de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema' },
-    // — Yerno habla —
-    { text: 'Si {yo} hubiera conocido a la esposa de {otro} a la edad de su hija, serían novios', level: 'extrema' },
-    { text: '{yo} le pondría a su hijo el nombre de {otro}', level: 'suave' },
-    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema' },
+    { text: 'Si hoy {otro} le pide a {yo} la mano de su hija, {yo} aceptaría', level: 'picante', yoRole: 'suegro' },
+    { text: 'Si la hija de {yo} le perdona una infidelidad a {otro}, {yo} aceptaría a {otro}', level: 'extrema', yoRole: 'suegro' },
+    // — Yerno habla ({yo} = yerno) —
+    { text: 'Si {yo} hubiera conocido a la esposa de {otro} a la edad de su hija, serían novios', level: 'extrema', yoRole: 'yerno' },
+    { text: '{yo} le pondría a su hijo el nombre de {otro}', level: 'suave', yoRole: 'yerno' },
+    { text: '{yo} mandaría a {otro} al asilo', level: 'extrema', yoRole: 'yerno' },
     { text: 'Si {yo} y {otro} fueran de la misma edad, serían amigos', level: 'suave' },
     { text: '{yo} ha probado más drogas que {otro}', level: 'picante' },
-    { text: 'Si la hija de {otro} tuviera un accidente, le hablaría primero a {yo}', level: 'picante' },
+    { text: 'Si la hija de {otro} tuviera un accidente, le hablaría primero a {yo}', level: 'picante', yoRole: 'yerno' },
     { text: '{yo} es más inteligente que {otro}', level: 'all' },
-    { text: '{yo} le va a dar mejor vida a la hija de {otro} que la que {otro} le dio', level: 'suave' },
+    { text: '{yo} le va a dar mejor vida a la hija de {otro} que la que {otro} le dio', level: 'suave', yoRole: 'yerno' },
   ],
 
   // ═══════════ ROOMIES ═══════════
@@ -444,6 +450,11 @@ export function resolveRelationToPool(
   genderA: Gender,
   genderB: Gender,
 ): RelationType {
+  // Padre/madre-hijo se resuelve aparte porque necesitamos saber QUIÉN es el padre
+  // (el case genérico de abajo perdía esa dirección y mandaba padre-hijo al pool de madre).
+  const parentChild = resolveParentChildPool(kindA, kindB, genderA, genderB);
+  if (parentChild) return parentChild;
+
   // Prioridad: usar la más específica si reportan distinto; si solo uno reportó, usar esa
   const kind = pickMostSpecific(kindA, kindB);
 
@@ -515,6 +526,101 @@ export function resolveRelationToPool(
     default:
       return 'amigos_generico';
   }
+}
+
+/**
+ * Resuelve pools padre/madre-hij@ con dirección correcta.
+ *
+ * Semántica de la matriz (dropdown "Mi mamá", "Mi hij@"…):
+ *   kindA = relationships[otro] del jugador {yo}  → lo que OTRO es de YO
+ *   kindB = relationships[yo] del jugador {otro}  → lo que YO es de OTRO
+ *
+ * - kindA='mama'/'papa'  → OTRO es el padre/madre (yo soy hij@)
+ * - kindB='hijo'         → OTRO declaró que YO es su hij@ (otro es padre/madre)
+ * - kindB='mama'/'papa'  → YO soy el padre/madre
+ * - kindA='hijo'         → YO declaré que OTRO es mi hij@ (yo soy padre/madre)
+ */
+function resolveParentChildPool(
+  kindA: RelationKind | undefined,
+  kindB: RelationKind | undefined,
+  genderA: Gender,
+  genderB: Gender,
+): RelationType | null {
+  // OTRO es el padre/madre de YO
+  if (kindA === 'mama' || kindA === 'papa' || kindB === 'hijo') {
+    return pickParentPool(genderB, genderA);
+  }
+  // YO soy el padre/madre de OTRO
+  if (kindB === 'mama' || kindB === 'papa' || kindA === 'hijo') {
+    return pickParentPool(genderA, genderB);
+  }
+  return null;
+}
+
+function pickParentPool(parentGender: Gender, childGender: Gender): RelationType {
+  const isMadre = parentGender !== 'hombre';
+  if (isMadre) return childGender === 'mujer' ? 'madre_hija' : 'madre_hijo';
+  return childGender === 'mujer' ? 'padre_hija' : 'padre_hijo';
+}
+
+/**
+ * Para pools asimétricos, determina el rol del jugador {yo} en términos de los
+ * tags `yoRole` usados en VIRAL_AFFIRMATIONS. Devuelve null si el pool es
+ * simétrico o si no hay información suficiente para determinar la dirección.
+ */
+export function getYoRoleForPair(
+  relationType: RelationType,
+  kindA: RelationKind | undefined,
+  kindB: RelationKind | undefined,
+): string | null {
+  switch (relationType) {
+    case 'madre_hijo':
+    case 'madre_hija': {
+      const childTag = relationType === 'madre_hija' ? 'hija' : 'hijo';
+      if (kindB === 'mama' || kindA === 'hijo') return 'madre';
+      if (kindA === 'mama' || kindB === 'hijo') return childTag;
+      return null;
+    }
+    case 'padre_hijo':
+    case 'padre_hija': {
+      const childTag = relationType === 'padre_hija' ? 'hija' : 'hijo';
+      if (kindB === 'papa' || kindA === 'hijo') return 'padre';
+      if (kindA === 'papa' || kindB === 'hijo') return childTag;
+      return null;
+    }
+    case 'suegra_nuera':
+      if (kindB === 'suegra' || kindA === 'nuera') return 'suegra';
+      if (kindA === 'suegra' || kindB === 'nuera') return 'nuera';
+      return null;
+    case 'suegro_yerno':
+      if (kindB === 'suegro' || kindA === 'yerno') return 'suegro';
+      if (kindA === 'suegro' || kindB === 'yerno') return 'yerno';
+      return null;
+    case 'jefe_empleado':
+      if (kindB === 'jefe' || kindA === 'empleado') return 'jefe';
+      if (kindA === 'jefe' || kindB === 'empleado') return 'empleado';
+      return null;
+    case 'profesor_exalumno':
+      if (kindB === 'profesor' || kindA === 'exalumno') return 'profesor';
+      if (kindA === 'profesor' || kindB === 'exalumno') return 'exalumno';
+      return null;
+    default:
+      return null; // pool simétrico — no aplica orientación
+  }
+}
+
+/**
+ * Filtra un pool por orientación:
+ * - Pool sin tags `yoRole` → se devuelve intacto (simétrico).
+ * - Con yoRole conocido → templates neutrales + los que coinciden con el rol.
+ * - Con yoRole desconocido (no se pudo determinar) → solo templates neutrales,
+ *   para nunca mostrar una afirmación con dirección equivocada.
+ */
+export function filterByOrientation(pool: ViralAffirmation[], yoRole: string | null): ViralAffirmation[] {
+  const hasOrientation = pool.some(a => a.yoRole);
+  if (!hasOrientation) return pool;
+  if (!yoRole) return pool.filter(a => !a.yoRole);
+  return pool.filter(a => !a.yoRole || a.yoRole === yoRole);
 }
 
 // Específicos ganan a genéricos (pareja > crush > amigo > conocido)
@@ -600,7 +706,9 @@ function describeSubject(p: PlayerIdentity, position: 1 | 2): string {
  * - Añade explícitamente que la expresión NO debe deformar la geometría facial
  *   (esto resuelve casos de horror/extreme expression que generaban caras genéricas).
  *
- * Devuelve null si la afirmación no tiene scenePrompt curado en este pool.
+ * Si la afirmación NO tiene scenePrompt curado, construye uno genérico a partir
+ * del texto de la afirmación — así el pipeline de imágenes nunca se queda seco
+ * cuando el juego cae a pools de fallback (amigos_generico, banco genérico, etc).
  */
 export function getScenePromptFor(
   relationType: RelationType,
@@ -609,10 +717,7 @@ export function getScenePromptFor(
   playerB?: PlayerIdentity,
 ): string | null {
   const pool = SCENE_PROMPTS[relationType];
-  if (!pool) return null;
-
-  const entry = pool.find(e => e.text === affirmationText);
-  if (!entry || !entry.scenePrompt) return null;
+  const entry = pool?.find(e => e.text === affirmationText);
 
   const subjectA = describeSubject(playerA, 1);
   const subjectB = playerB ? describeSubject(playerB, 2) : '';
@@ -628,10 +733,34 @@ Even if the scene below describes extreme emotions (horror, shock, ecstasy, ange
 
 `;
 
-  let basePrompt = entry.scenePrompt
-    .replace(/\[SUBJECT_A\]/g, playerA.name)
-    .replace(/\[SUBJECT_B\]/g, playerB?.name || '[SUBJECT_B]');
+  let basePrompt: string;
+  if (entry?.scenePrompt) {
+    basePrompt = entry.scenePrompt
+      .replace(/\[SUBJECT_A\]/g, playerA.name)
+      .replace(/\[SUBJECT_B\]/g, playerB?.name || '[SUBJECT_B]');
+  } else {
+    // Fallback genérico: sin prompt curado, escenificamos la afirmación directamente.
+    const filled = fillTemplate(affirmationText, playerA.name, playerB?.name || 'su acompañante');
+    basePrompt = buildGenericScenePrompt(filled, !!playerB);
+  }
 
   return identityLock + basePrompt;
+}
+
+/**
+ * Scene prompt genérico para afirmaciones sin prompt curado.
+ * Calidad ligeramente menor que los curados con Sonnet, pero mantiene
+ * el flujo de imágenes vivo durante toda la partida.
+ */
+function buildGenericScenePrompt(filledAffirmation: string, twoSubjects: boolean): string {
+  const subjects = twoSubjects
+    ? 'The TWO people from the attached reference photos'
+    : 'The person from the attached reference photo';
+  return `Hyperrealistic cinematic film still, square 1:1 aspect ratio, photo-real grade. Shot on a 35mm full-frame camera, 50mm lens at f/2.0, shallow depth of field, motivated practical lighting (warm amber key, soft teal fill), subtle film grain, natural skin texture with visible pores and real imperfections.
+
+THE SCENE: ${subjects} acting out — in a comedic, theatrical, over-the-top cinematic way — the situation described by this party-game statement (in Spanish): "${filledAffirmation}". Interpret the statement literally and stage it as a single dramatic frozen moment in a fitting everyday Mexican setting (living room, kitchen, backyard party, cantina, or street at night). Expressive faces and body language, but anatomically natural — no exaggerated deformation.
+
+CRITICAL — ABSOLUTELY NO TEXT: no words, no captions, no subtitles, no logos, no watermarks, no signs or readable labels anywhere in the image.
+AVOID (anti-AI checklist): plastic skin, airbrushed smoothing, perfectly symmetric idealized faces, oversaturated HDR glow, extra fingers, deformed hands, mannequin look, stock-photo poses.`;
 }
 
