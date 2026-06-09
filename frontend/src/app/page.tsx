@@ -8,6 +8,7 @@ import StartingView from '@/components/StartingView';
 import ConfirmView from '@/components/ConfirmView';
 import GuessingView from '@/components/GuessingView';
 import RevealView from '@/components/RevealView';
+import BugReportButton from '@/components/BugReportButton';
 
 export default function Home() {
   const game = useGameSocket();
@@ -41,6 +42,8 @@ export default function Home() {
     );
   }
 
+  const inGame = ['confirming', 'guessing', 'reveal'].includes(game.phase);
+
   return (
     <main className="min-h-[100dvh]">
       {game.phase === 'landing' && <LandingView game={game} />}
@@ -50,6 +53,7 @@ export default function Home() {
       {game.phase === 'confirming' && <ConfirmView game={game} />}
       {game.phase === 'guessing' && <GuessingView game={game} />}
       {game.phase === 'reveal' && <RevealView game={game} />}
+      {inGame && <BugReportButton game={game} />}
     </main>
   );
 }

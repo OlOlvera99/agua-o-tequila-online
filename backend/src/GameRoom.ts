@@ -53,6 +53,14 @@ export class GameRoom {
   /** Último payload de REVEAL — para restaurar estado al reconectarse en fase reveal. */
   lastReveal: any = null;
 
+  /** Historial corto de eventos para contexto en bug reports. */
+  history: string[] = [];
+
+  logEvent(msg: string) {
+    this.history.push(`${new Date().toISOString().slice(11, 19)} ${msg}`);
+    if (this.history.length > 50) this.history.shift();
+  }
+
   // ═══════════ COLA DE TURNOS PRE-COMPUTADOS ═══════════
   // Permite pre-generar imágenes mientras se juega.
   upcomingTurns: PendingTurn[] = [];
@@ -113,6 +121,7 @@ export class GameRoom {
     const p = this.players.find(pl => pl.socketId === socketId);
     if (p) {
       p.connected = false;
+      this.logEvent(`DISCONNECT ${p.name} (fase ${this.phase}, R${this.round})`);
       console.log(`🔌💤 ${p.name} desconectado (puede reconectarse)`);
     }
     this.touch();
@@ -139,6 +148,7 @@ export class GameRoom {
     if (this.currentTurnRef && this.currentTurnRef.yoSocketId === oldId) {
       this.currentTurnRef.yoSocketId = newSocketId;
     }
+    this.logEvent(`RECONNECT ${p.name} (fase ${this.phase}, R${this.round})`);
     console.log(`🔌✅ ${p.name} reconectado (${oldId.slice(0, 6)}… → ${newSocketId.slice(0, 6)}…)`);
     this.touch();
     return p;
@@ -386,6 +396,7 @@ export class GameRoom {
     this.currentRelationType = t.relationType;
     this.currentOtherPlayerName = t.otroName;
     this.currentImageBase64 = t.imageBase64 || '';
+    this.logEvent(`TURN R${t.round} [${t.relationType}] ${t.yoName}→${t.otroName} "${t.affirmation}" img=${t.imageBase64 ? 'sí' : 'no'}`);
     console.log(`🎯 R${t.round} [${t.relationType}] ${t.yoName}→${t.otroName}: "${t.affirmation}"${t.imageBase64 ? ' 🖼️' : ''}`);
   }
 
@@ -557,6 +568,48 @@ export class GameRoom {
       scoreboard: this.getScoreboard(),
       reveal: this.phase === 'reveal' ? this.lastReveal : null,
       myGuess: me?.currentGuess ?? null,
+    };
+  }
+
+  /**
+   * Dump completo para bug reports — todo lo necesario para analizar la falla,
+   * SIN base64 (selfies/imágenes) para que el log sea legible y ligero.
+   */
+  getDebugDump() {
+    return {
+      roomId: this.id,
+      phase: this.phase,
+      round: this.round,
+      settings: this.settings,
+      currentAffirmation: this.currentAffirmation,
+      currentTemplate: this.currentAffirmationTemplate,
+      currentRelationType: this.currentRelationType,
+      currentPlayer: this.getCurrentPlayerName(),
+      currentOtherPlayer: this.currentOtherPlayerName,
+      currentTruth: this.currentTruth,
+      currentHasImage: !!this.currentImageBase64,
+      players: this.players.map(p => ({
+        name: p.name,
+        isHost: p.isHost,
+        connected: p.connected !== false,
+        ready: p.questionnaireReady,
+        gender: p.profile?.gender,
+        hasSelfie: !!p.profile?.selfieBase64,
+        relationships: p.profile?.relationships,
+        guess: p.currentGuess,
+        shots: p.shotsTaken,
+      })),
+      upcomingTurns: this.upcomingTurns.map(t => ({
+        round: t.round,
+        yo: t.yoName,
+        otro: t.otroName,
+        relationType: t.relationType,
+        affirmation: t.affirmation,
+        imageReady: !!t.imageBase64,
+        imageGenStarted: t.imageGenStarted,
+        imageGenAttempts: t.imageGenAttempts || 0,
+      })),
+      history: this.history,
     };
   }
 

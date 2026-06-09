@@ -406,6 +406,26 @@ io.on('connection', (socket) => {
     kickoffPendingImageGen(room, roomId);
   });
 
+  socket.on('REPORT_ISSUE', ({ roomId, comment }, callback) => {
+    if (!checkRate(socket.id, 5, 60_000)) return callback?.({ error: 'Demasiados reportes' });
+    const room = roomManager.getRoom(roomId);
+    if (!room) return callback?.({ error: 'Sala no encontrada' });
+    const reporter = room.players.find(p => p.socketId === socket.id);
+    if (!reporter) return callback?.({ error: 'No estás en esta sala' });
+    const cleanComment = sanitizeStr(comment, 500) || '(sin comentario)';
+
+    // Marcador grepeable en logs de Railway: filter "BUG_REPORT"
+    const report = {
+      ts: new Date().toISOString(),
+      reporter: reporter.name,
+      comment: cleanComment,
+      state: room.getDebugDump(),
+    };
+    console.log(`🐞 BUG_REPORT ${JSON.stringify(report)}`);
+    room.logEvent(`BUG_REPORT de ${reporter.name}: "${cleanComment}"`);
+    callback?.({ success: true });
+  });
+
   socket.on('disconnect', () => {
     console.log(`❌ Desconectado: ${socket.id}`);
     const room = roomManager.findRoomBySocket(socket.id);

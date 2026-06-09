@@ -133,6 +133,7 @@ export interface ClientEvents {
   SUBMIT_GUESS: (data: { roomId: string; guess: 'verdad' | 'mentira' }) => void;
   NEXT_TURN: (data: { roomId: string }) => void;
   REGENERATE_AFFIRMATION: (data: { roomId: string }) => void;
+  REPORT_ISSUE: (data: { roomId: string; comment: string }, cb: (res: { success?: boolean; error?: string }) => void) => void;
 }
 
 // ═══════════ EVENTOS SERVIDOR → CLIENTE ═══════════

@@ -321,6 +321,15 @@ export function useGameSocket() {
     socketRef.current?.emit('REGENERATE_AFFIRMATION', { roomId });
   }, [roomId]);
 
+  const reportIssue = useCallback(async (comment: string) => {
+    return new Promise<void>((resolve, reject) => {
+      socketRef.current?.emit('REPORT_ISSUE', { roomId, comment }, (res: any) => {
+        if (res?.success) resolve();
+        else reject(res?.error || 'No se pudo enviar');
+      });
+    });
+  }, [roomId]);
+
   return {
     connected, mySocketId, myName, roomId,
     phase, roomState, turnData, guessCount,
@@ -329,6 +338,6 @@ export function useGameSocket() {
     isHost, isMyTurn,
     createRoom, joinRoom, updateSettings,
     submitProfile, startGame, confirmTruth, submitGuess,
-    nextTurn, regenerate,
+    nextTurn, regenerate, reportIssue,
   };
 }
